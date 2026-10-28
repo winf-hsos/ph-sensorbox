@@ -84,17 +84,20 @@ The manual shows no example for the root path of a subdomain, but this form work
 ## 6. Check
 
 1. `https://ph.hsos.uber.space/` shows the overview, `https://ph.hsos.uber.space/docs` the API.
-2. `https://ph.hsos.uber.space/admin` asks for the user `admin` and the password from step 3.
+2. `https://ph.hsos.uber.space/admin` leads to the login page, which takes the password from step 3.
 3. On the bench: `python tools/bench_box.py --server https://ph.hsos.uber.space --box bench`, then approve the box under `/admin`.
 4. The overview updates live within a minute. A test on 2026-10-28 from the university network showed that the event stream is cut after exactly 60 seconds, although the keep-alive at 30 seconds arrived; the same test against the local server stayed open, so the cut happens on the way through Uberspace's front end or the university network (not yet clear which). The dashboard copes with it: the browser reconnects after five seconds and the page then fetches the readings it may have missed.
 5. Memory use: `systemctl --user status ph-sensorbox` shows it.
 
 ## 7. Updates
 
+Updates are copied by hand from a clean checkout of `main` (https://github.com/winf-hsos/ph-sensorbox); there is no automatic update yet. `git archive` packs only committed files, so the local virtual environment, database and password cannot slip in, and it also works on Windows without rsync (run it from Git Bash, because a PowerShell pipe would corrupt the binary archive). The server tests run on the Asteroid before the restart.
+
 ```bash
-rsync -a --exclude .venv --exclude __pycache__ --exclude "*.sqlite3*" --exclude .admin_password server/ hsos@<host>.uberspace.de:ph-sensorbox/server/
-ssh hsos@<host>.uberspace.de 'cd ph-sensorbox/server && .venv/bin/python -m pip install -r requirements.txt && systemctl --user restart ph-sensorbox'
+git archive --format=tar HEAD:server | ssh hsos@<host>.uberspace.de 'tar -x -C ~/ph-sensorbox/server && cd ~/ph-sensorbox/server && .venv/bin/python -m pip install -q -r requirements.txt && .venv/bin/python -m pytest -q && systemctl --user restart ph-sensorbox'
 ```
+
+The archive overwrites changed files and adds new ones but does not delete files that were removed from the repository; those have to be removed by hand. The first update this way went from `a64c934` to `b3127cb` on 2026-10-28, after checking that the files on the server still matched `a64c934`.
 
 Boxes keep their readings while the server restarts and upload them afterwards (see `06-box-protocol.md`).
 
