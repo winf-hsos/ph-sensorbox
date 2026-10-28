@@ -1,6 +1,6 @@
 # Architecture
 
-Status: proposal, 2026-10-28. It follows the component proposal in `01-components.md` (EZO-pH on an RS232 Bricklet, Thermocouple Bricklet for temperature) and has to be revisited if the front end changes.
+Status: proposal, 2026-10-28. It follows the bench setup in `01-components.md` (Atlas Surveyor analog pH board on the Analog In Bricklet 3.0, Thermocouple Bricklet for temperature). In this setup the Brick reads two voltages and the software computes the pH, whereas an EZO-pH upgrade would move that computation into the EZO and add the RS232 Bricklet; the design has to be revisited if the front end changes.
 
 ## 1. What the ESP32 Brick can do
 
@@ -10,7 +10,7 @@ The firmware is open source under the LGPL 2.1 (`software/LICENSE` in that repos
 
 ## 2. Proposed approach in three phases
 
-**Phase 0, bench test without own firmware.** The Brick keeps its standard firmware and a laptop reads the Bricklets through the Python API bindings over the network. The source code of the firmware opens TCP port 4223 for this (`proxy.cpp`), whereas no documentation page was found that confirms it, so this is the first thing to try. The phase answers the open hardware questions: does the EZO work on the RS232 Bricklet, what does the thermocouple deliver, does the thermocouple disturb the pH signal, and what is the real noise level. The old prototype in `ph-sensor-dashboard` took the same route, but only read a voltage.
+**Phase 0, bench test without own firmware.** The Brick keeps its standard firmware and a laptop reads the Bricklets through the Python API bindings over the network. The source code of the firmware opens TCP port 4223 for this (`proxy.cpp`), whereas no documentation page was found that confirms it, so this is the first thing to try. The phase answers the open hardware questions: how large the noise and drift of the analog pH voltage are, what the thermocouple delivers, whether the thermocouple disturbs the pH signal, and how well a two- or three-point calibration with buffers holds. The calibration and compensation code is first written in Python here and later ported to the firmware. The old prototype in `ph-sensor-dashboard` took the same route, but only read a voltage.
 
 **Phase 1, own module on the Brick.** The measurement runs on the Brick without a computer. A module in the Tinkerforge firmware reads the EZO and the thermocouple, sends the temperature to the EZO for compensation, stores the readings and serves them. The module route gives Wi-Fi setup, firmware update over the network and NTP time for free, at the price of the large build chain and the LGPL; the lighter alternative is an Arduino sketch, which would require writing the network setup, update and web server ourselves. We propose the module route and flag the licence consequence in the open questions.
 
@@ -20,8 +20,8 @@ The firmware is open source under the LGPL 2.1 (`software/LICENSE` in that repos
 
 | Part | Task |
 |---|---|
-| Sampling loop | Read the pH once per second from the EZO, read the temperature from the thermocouple, send the temperature to the EZO. |
-| Calibration | One-, two- or three-point calibration controlled from the web interface, with each event written to the log. |
+| Sampling loop | Read the voltage of the pH board from the Analog In Bricklet and the temperature from the thermocouple once per second, average, and compute the pH. With an EZO upgrade, read the pH from the EZO instead and send it the temperature. |
+| Calibration | Two- or three-point calibration controlled from the web interface (a linear fit of voltage against pH, slope scaled with the absolute temperature), with each event written to the log. |
 | Log | Records of time (UTC from NTP), pH, temperature, plus metadata of the active probe and calibration. |
 | Web interface | Live value, short history, calibration, download. German and English. |
 | API | Read-only JSON endpoints for the current reading, a time range of the log (JSON or CSV) and the metadata; optional push to an MQTT broker or an HTTP address in the lab. |
@@ -34,7 +34,7 @@ The standard partition for files is about 3.4 MiB. With a compact record of 32 b
 
 ## 4. Data access
 
-The central promise of the project is open access, so the record format is part of the architecture. Proposed fields per reading: UTC time, pH, temperature in °C, identifier of the active probe, identifier of the active calibration; and per calibration event: time, buffer values, buffer temperature, slope and offset. The same schema serves the CSV download and the JSON API, and the web interface only reads what the API serves. Authentication follows the firmware's own options (the proxy module accepts a secret); an unauthenticated port on a lab network is acceptable for tests only.
+The central promise of the project is open access, so the record format is part of the architecture. Proposed fields per reading: UTC time, pH, raw electrode-board voltage, temperature in °C, identifier of the active probe, identifier of the active calibration; and per calibration event: time, buffer values, buffer temperature, slope and offset. The same schema serves the CSV download and the JSON API, and the web interface only reads what the API serves. Authentication follows the firmware's own options (the proxy module accepts a secret); an unauthenticated port on a lab network is acceptable for tests only.
 
 ## 5. Enclosure requirements (3D printed)
 

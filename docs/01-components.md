@@ -28,7 +28,7 @@ Tinkerforge sells no pH or potentiostat Bricklet; the shop list of 75 Bricklets 
 |---|---|---|---|---|
 | **A. Atlas EZO-pH circuit** on an isolated carrier board ([circuit](https://www.atlas-scientific.com/circuits/ezo-ph-circuit/), [carrier](https://atlas-scientific.com/carrier-boards/electrically-isolated-ezo-carrier-board/)) | UART or I2C, ASCII | ±0.002 pH for the circuit alone, electrode not included | no, the datasheet is marked "patent protected"; only the host libraries are on GitHub | UART via the RS232 Bricklet 2.0 is compatible on paper; no practical report found |
 | **B. Own electrometer stage** (LMP7721, ADA4530-1 or the pH front end LMP91200) read by the Industrial Dual Analog In | bipolar analog voltage | depends on our design | yes, if we publish the board | works, but needs a PCB design and an amplification stage |
-| C. Gravity analog modules (DFRobot SEN0161-V2, Atlas Gravity) | 0 to 3 V, about 177 mV per pH | ±0.1 pH (DFRobot), ±0.2 pH (Atlas) | no | Even a ±4 mV reading gives only ±0.023 pH at best (calculation), and the vendor tolerance is already larger. Rejected. |
+| C. Gravity analog modules (DFRobot SEN0161-V2, Atlas Gravity) | 0 to 3 V, about 177 mV per pH | ±0.1 pH (DFRobot), ±0.2 pH (Atlas) | no | Usable for ±0.1 to ±0.2 pH and in use as the bench setup since 2026-10-28 (see below). Not suited for ±0.02 pH, because even a ±4 mV reading gives only ±0.023 pH at best (calculation) and the vendor tolerance is larger still. |
 | D. Electrode directly at a Bricklet | | | | Rejected, see section 2. |
 
 Option A details that matter for the box:
@@ -40,7 +40,20 @@ Option A details that matter for the box:
 - The circuit does one-, two- and three-point calibration (vendor page); where the calibration is stored is still to be verified.
 - The EZO is not isolated by itself. Atlas recommends isolation near pumps and valves, and the carrier board provides isolated power and data. The Tinkerforge Isolator Bricklet (19.99 EUR) isolates a Bricklet from the Brick and would be an alternative **(inference: one of the two is enough)**.
 
-**Proposed route:** build the first prototype with option A, because it reaches the target accuracy with the least design work, and evaluate option B in parallel as the fully open variant. Whether option A is open enough for the project is a question for Nicolas (see `04-open-questions.md`).
+### Bench setup in use (since 2026-10-28)
+
+Nicolas builds the first prototype with an Atlas Scientific Surveyor pH Meter V3.0 (analog board with an SMA input and three pins marked −, + and A) wired to the Analog In Bricklet 3.0 on the ESP32 Brick, with the Thermocouple Bricklet for temperature; this follows a photo of the setup. The facts below come from the datasheet V2.4 of the Atlas analog pH circuit, as found for the Gravity/Surveyor analog family, and whether it covers this V3.0 board revision is **not verified**:
+
+- The output falls from 3.00 V at pH 0 to 0.265 V at pH 14, which is about 177 mV per pH unit with a tolerance of ±15 mV in the datasheet table, so the voltage decreases when the pH rises.
+- The supply is 3.3 to 5.5 V at 3 mA, the accuracy is stated as ±0.2 pH, there is no isolation and no temperature compensation, and the output is unpredictable while no probe is connected.
+
+Consequences (calculation): one Bricklet step of about 10 mV corresponds to about 0.058 pH, which is below the vendor's ±0.2 pH, so the Bricklet is not the limiting part at this accuracy and the setup is a sensible way to start. The conversion from voltage to pH, the calibration and the temperature compensation then have to be done in our own software: a linear fit of voltage against pH from two or three buffers, and a slope that is scaled with the absolute temperature taken from the thermocouple (Nernst). This suits the open-data goal, because the raw voltage stays available next to the pH value. Averaging several samples may reduce the noise further, and the Analog In API should be checked for a built-in averaging or oversampling setting (not verified).
+
+Points to settle with this setup: the supply pin used on the Bricklet (5 V or 3.3 V) and the common ground, which the photo does not show clearly; the missing isolation, which makes the thermocouple coupling test of section 5 more important (Atlas sells a separate analog isolator for this case); and the electrode, which has to match the SMA input.
+
+Upgrade paths, in order of effort: reading the same Atlas board with the Industrial Dual Analog In (40 EUR, 24 bit) for a finer reading, replacing the board by the EZO-pH on the RS232 Bricklet (option A) for the vendor's ±0.002 pH at the circuit, or an own electrometer stage (option B).
+
+**Proposed route:** continue with the bench setup, develop the software side (calibration, temperature compensation, record format) against it, and decide on an upgrade once the target accuracy is fixed. Which accuracy the project aims at, and whether the closed Atlas circuits are open enough for the project, are questions for Nicolas (see `04-open-questions.md`).
 
 ## 4. Electrode
 

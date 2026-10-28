@@ -1,6 +1,20 @@
 # Bill of materials, first draft
 
-Status: proposal, 2026-10-28, for the prototype route (EZO-pH on an RS232 Bricklet, thermocouple for temperature). Prices are list prices of 2026-10-28 including 19 % VAT where the vendor shows it (Tinkerforge, RS, RobotShop EU) and are kept in the currency of the source. Nothing has been ordered. Shop pages carry no date of their own, so prices have to be re-checked at the time of ordering.
+Status: proposal, 2026-10-28. The bench setup in use is an Atlas Surveyor analog pH board on the Analog In Bricklet 3.0 with the thermocouple for temperature (parts owned according to Nicolas' photos); the table below lists that setup first and the EZO-pH route as an upgrade.
+
+## Bench setup in use
+
+| Item | Qty | Price | Status |
+|---|---|---|---|
+| Tinkerforge ESP32 Brick (assumed from the photo, to confirm) | 1 | 44.99 EUR | owned |
+| Tinkerforge Analog In Bricklet 3.0 | 1 | 13.99 EUR | owned |
+| Tinkerforge Thermocouple Bricklet 2.0 | 1 | 27.99 EUR | owned |
+| Thermocouple probe, B+B K-M625 0100-30 | 3 | – | owned |
+| Atlas Scientific Surveyor pH Meter V3.0 (analog) | 1 | not researched for V3.0; the Gravity analog module was listed at 28.99 USD and the kit with probe at 69.99 USD | owned |
+| Atlas Scientific pH probe in its storage tube (photo of 2026-10-28; exact model and connector not identified) | 1 | the Atlas lab-grade probe was listed at 86.99 USD or 95.69 EUR | owned; model, membrane type and storage solution to confirm |
+| Buffer solutions pH 4.01, 7.00, 10.01 | 1 set | pH 10.01, 1 L: 41.19 EUR; the other two not priced | to buy or from stock |
+
+## Upgrade: EZO-pH route Prices are list prices of 2026-10-28 including 19 % VAT where the vendor shows it (Tinkerforge, RS, RobotShop EU) and are kept in the currency of the source. Nothing has been ordered. Shop pages carry no date of their own, so prices have to be re-checked at the time of ordering.
 
 ## Prototype
 
