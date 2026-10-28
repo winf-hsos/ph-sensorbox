@@ -7,17 +7,19 @@ or PHBOX_ADMIN_PASSWORD_FILE (a file holding the password).
 import asyncio
 import csv
 import hashlib
+import hmac
 import io
 import json
 import os
 import secrets
+import time
 from bisect import bisect_right
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -28,6 +30,12 @@ from .calibration import NOMINAL, Calibration, fit, slope_percent, to_ph
 STATIC = Path(__file__).parent / "static"
 BOX_ID = r"^[A-Za-z0-9_-]{1,32}$"
 EARLIEST = datetime(2020, 1, 1, tzinfo=timezone.utc)  # older stamps mean the box clock is unset
+SESSION_COOKIE = "phbox_admin"
+SESSION_SECONDS = 7 * 24 * 3600
+
+
+class LoginIn(BaseModel):
+    password: str = Field(max_length=256)
 
 
 class RegisterIn(BaseModel):
@@ -103,15 +111,32 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
     app = FastAPI(title="pH Sensor Box server")
     basic = HTTPBasic(auto_error=False)
 
-    def require_admin(credentials: HTTPBasicCredentials | None = Depends(basic)):
+    # Browsers log in through /login and get a signed session cookie; scripts may use
+    # HTTP basic auth with the user "admin". The cookie is signed with the admin
+    # password, so changing the password ends every session.
+    def session_token(expires: int) -> str:
+        mac = hmac.new(admin_password.encode(), f"phbox-admin:{expires}".encode(), hashlib.sha256)
+        return f"{expires}.{mac.hexdigest()}"
+
+    def valid_session(value: str | None) -> bool:
+        expires = (value or "").partition(".")[0]
+        if not expires.isdigit() or int(expires) < time.time():
+            return False
+        return secrets.compare_digest(value.encode(), session_token(int(expires)).encode())
+
+    def is_admin(request: Request, credentials: HTTPBasicCredentials | None) -> bool:
         if not admin_password:
             raise HTTPException(503, "admin password not configured (PHBOX_ADMIN_PASSWORD)")
-        ok = credentials is not None and (
+        if valid_session(request.cookies.get(SESSION_COOKIE)):
+            return True
+        return credentials is not None and (
             secrets.compare_digest(credentials.username.encode(), b"admin")
             & secrets.compare_digest(credentials.password.encode(), admin_password.encode())
         )
-        if not ok:
-            raise HTTPException(401, headers={"WWW-Authenticate": 'Basic realm="pH Sensor Box admin"'})
+
+    def require_admin(request: Request, credentials: HTTPBasicCredentials | None = Depends(basic)):
+        if not is_admin(request, credentials):
+            raise HTTPException(401, "login required")
 
     def box_or_404(box_id: str):
         box = db.get_box(con, box_id)
@@ -263,6 +288,25 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
 
     # --- administration ----------------------------------------------------------------
 
+    @app.post("/api/v1/login")
+    async def login(body: LoginIn, request: Request, response: Response):
+        if not admin_password:
+            raise HTTPException(503, "admin password not configured (PHBOX_ADMIN_PASSWORD)")
+        if not secrets.compare_digest(body.password.encode(), admin_password.encode()):
+            await asyncio.sleep(1)  # slows down guessing
+            raise HTTPException(401, "wrong password")
+        expires = int(time.time()) + SESSION_SECONDS
+        # behind Uberspace's proxy the app itself is reached over plain HTTP
+        https = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+        response.set_cookie(SESSION_COOKIE, session_token(expires), max_age=SESSION_SECONDS,
+                            httponly=True, samesite="strict", secure=https)
+        return {"ok": True}
+
+    @app.post("/api/v1/logout")
+    async def logout(response: Response):
+        response.delete_cookie(SESSION_COOKIE)
+        return {"ok": True}
+
     @app.get("/api/v1/admin/boxes", dependencies=[Depends(require_admin)])
     async def admin_boxes():
         return [box_out(b) for b in db.list_boxes(con)]
@@ -298,9 +342,15 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
     async def box_page():
         return FileResponse(STATIC / "box.html")
 
-    @app.get("/admin", include_in_schema=False, dependencies=[Depends(require_admin)])
-    async def admin_page():
+    @app.get("/admin", include_in_schema=False)
+    async def admin_page(request: Request, credentials: HTTPBasicCredentials | None = Depends(basic)):
+        if not is_admin(request, credentials):
+            return RedirectResponse("/login", status_code=303)
         return FileResponse(STATIC / "admin.html")
+
+    @app.get("/login", include_in_schema=False)
+    async def login_page():
+        return FileResponse(STATIC / "login.html")
 
     @app.middleware("http")
     async def revalidate_static(request: Request, call_next):

@@ -10,7 +10,10 @@
 </head>
 <body>
   <main class="wrap">
-    <p class="lede" id="title"></p>
+    <div class="title-row">
+      <p class="lede" id="title"></p>
+      <button class="button" type="button" id="logout"></button>
+    </div>
 
     <section class="block" id="pendingBlock" hidden>
       <h2 id="pendingTitle"></h2>
@@ -141,11 +144,22 @@
     }
 
     async function load() {
-      boxes = await api("/api/v1/admin/boxes");
+      try {
+        boxes = await api("/api/v1/admin/boxes");
+      } catch (error) {
+        if (error.status === 401) location.href = "/login"; // session expired
+        throw error;
+      }
       renderPending();
       renderBoxes();
       renderCalBoxes();
     }
+
+    $("logout").textContent = t("logout");
+    $("logout").addEventListener("click", async () => {
+      await api("/api/v1/logout", { method: "POST" });
+      location.href = "/";
+    });
 
     load();
     live({ box: () => load() }, load);

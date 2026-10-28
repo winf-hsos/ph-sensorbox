@@ -20,7 +20,7 @@ PHBOX_ADMIN_PASSWORD=choose-one .venv/Scripts/python -m uvicorn phbox_server.mai
 
 Deployment on Uberspace 8 is described in `../docs/07-deployment-uberspace.md`.
 
-Pages: `/` overview of all approved boxes, `/box?id=…` history and calibrations of one box, `/admin` approval, names, intervals and calibration entry (HTTP basic auth, user `admin`). The API is listed at `/docs`.
+Pages: `/` overview of all approved boxes, `/box?id=…` history and calibrations of one box, `/admin` approval, names, intervals and calibration entry. The administration is entered through `/login` with the admin password, which sets a session cookie for seven days (HttpOnly, SameSite=Strict, Secure behind HTTPS, signed with the password, so changing the password ends all sessions); scripts can use HTTP basic auth with the user `admin` instead. The API is listed at `/docs`.
 
 To feed it with real data from the bench, run `../tools/bench_box.py`, which reads the Bricklets through a Brick Daemon and behaves like a box; approve the box `bench` under `/admin` afterwards.
 

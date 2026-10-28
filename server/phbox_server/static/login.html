@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pH-Sensorbox</title>
+  <script>try { const theme = localStorage.getItem("theme"); if (theme) document.documentElement.dataset.theme = theme; } catch {}</script>
+  <link rel="preload" href="/static/fonts/instrument-sans-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <form class="login" id="form">
+      <h1 id="title"></h1>
+      <p class="muted" id="hint"></p>
+      <label for="password" id="label"></label>
+      <input class="field" id="password" type="password" autocomplete="current-password" required autofocus>
+      <button class="button primary" type="submit" id="submit"></button>
+      <p class="message" id="message" role="alert"></p>
+    </form>
+  </main>
+  <script src="/static/app.js"></script>
+  <script>
+    initPage("admin");
+    document.title = `${t("login")} – ${t("brand")}`;
+    const $ = (sel) => document.getElementById(sel);
+    $("title").textContent = t("loginTitle");
+    $("hint").textContent = t("loginHint");
+    $("label").textContent = t("password");
+    $("submit").textContent = t("login");
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("message").textContent = "";
+      $("submit").disabled = true;
+      try {
+        await api("/api/v1/login", { method: "POST", body: JSON.stringify({ password: $("password").value }) });
+        location.href = "/admin";
+      } catch (error) {
+        $("message").textContent = error.status === 401 ? t("wrongPassword") : error.message;
+        $("password").select();
+      } finally {
+        $("submit").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -68,6 +68,12 @@ const TEXT = {
     saveCalibration: "Kalibrierung speichern",
     calSaved: (s, o) => `Kalibrierung gespeichert: Steilheit ${s}, Spannung bei pH 7 ${o}.`,
     noApproved: "Es gibt noch keine freigegebene Box.",
+    loginTitle: "Anmelden zur Verwaltung",
+    loginHint: "Die Verwaltung braucht das Verwaltungspasswort. Ansehen und Herunterladen der Messwerte geht ohne Anmeldung.",
+    password: "Passwort",
+    login: "Anmelden",
+    wrongPassword: "Das Passwort stimmt nicht.",
+    logout: "Abmelden",
   },
   en: {
     brand: "pH Sensor Box",
@@ -136,6 +142,12 @@ const TEXT = {
     saveCalibration: "Save calibration",
     calSaved: (s, o) => `Calibration saved: slope ${s}, voltage at pH 7 ${o}.`,
     noApproved: "No box has been approved yet.",
+    loginTitle: "Log in to the administration",
+    loginHint: "The administration needs the admin password. Viewing and downloading readings works without logging in.",
+    password: "Password",
+    login: "Log in",
+    wrongPassword: "The password is not correct.",
+    logout: "Log out",
   },
 };
 

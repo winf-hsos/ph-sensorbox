@@ -92,5 +92,32 @@ def test_admin_password_from_file(tmp_path, monkeypatch):
 def test_pages_and_admin_protection(approved):
     assert approved.get("/").status_code == 200
     assert approved.get("/box?id=box1").status_code == 200
-    assert approved.get("/admin").status_code == 401
+    assert approved.get("/login").status_code == 200
+    r = approved.get("/admin", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"
     assert approved.get("/admin", auth=ADMIN).status_code == 200
+
+
+def test_login_session_and_logout(client):
+    assert client.post("/api/v1/login", json={"password": "wrong"}).status_code == 401
+    assert client.get("/api/v1/admin/boxes").status_code == 401
+    r = client.post("/api/v1/login", json={"password": ADMIN[1]})
+    assert r.status_code == 200
+    cookie = r.headers["set-cookie"]
+    assert "HttpOnly" in cookie and "SameSite=strict" in cookie and "Secure" not in cookie
+    assert client.get("/api/v1/admin/boxes").status_code == 200
+    assert client.get("/admin", follow_redirects=False).status_code == 200
+    client.post("/api/v1/logout")
+    assert client.get("/api/v1/admin/boxes").status_code == 401
+
+
+def test_forged_or_expired_session_is_refused(client):
+    client.cookies.set("phbox_admin", "9999999999.deadbeef")
+    assert client.get("/api/v1/admin/boxes").status_code == 401
+    client.cookies.set("phbox_admin", "1.0")
+    assert client.get("/api/v1/admin/boxes").status_code == 401
+
+
+def test_session_cookie_is_secure_behind_https_proxy(client):
+    r = client.post("/api/v1/login", json={"password": ADMIN[1]}, headers={"X-Forwarded-Proto": "https"})
+    assert "Secure" in r.headers["set-cookie"]
