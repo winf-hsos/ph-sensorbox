@@ -80,6 +80,15 @@ def test_csv_export(approved):
     assert len(lines) == 2 and lines[1].startswith("2026-10-28T09:00:10Z")
 
 
+def test_admin_password_from_file(tmp_path, monkeypatch):
+    (tmp_path / "pw").write_text("from-file\n")
+    monkeypatch.delenv("PHBOX_ADMIN_PASSWORD", raising=False)
+    monkeypatch.setenv("PHBOX_ADMIN_PASSWORD_FILE", str(tmp_path / "pw"))
+    client = TestClient(create_app(db_path=str(tmp_path / "db.sqlite3")))
+    assert client.get("/api/v1/admin/boxes", auth=("admin", "from-file")).status_code == 200
+    assert client.get("/api/v1/admin/boxes", auth=("admin", "wrong")).status_code == 401
+
+
 def test_pages_and_admin_protection(approved):
     assert approved.get("/").status_code == 200
     assert approved.get("/box?id=box1").status_code == 200

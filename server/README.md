@@ -16,6 +16,9 @@ PHBOX_ADMIN_PASSWORD=choose-one .venv/Scripts/python -m uvicorn phbox_server.mai
 |---|---|---|
 | `PHBOX_DB` | path of the SQLite file | `phbox.sqlite3` in the working directory |
 | `PHBOX_ADMIN_PASSWORD` | password of the user `admin` for `/admin` and the admin API | none; admin functions are disabled without it |
+| `PHBOX_ADMIN_PASSWORD_FILE` | file holding that password, used when `PHBOX_ADMIN_PASSWORD` is not set | none |
+
+Deployment on Uberspace 8 is described in `../docs/07-deployment-uberspace.md`.
 
 Pages: `/` overview of all approved boxes, `/box?id=…` history and calibrations of one box, `/admin` approval, names, intervals and calibration entry (HTTP basic auth, user `admin`). The API is listed at `/docs`.
 
@@ -29,8 +32,8 @@ To feed it with real data from the bench, run `../tools/bench_box.py`, which rea
 
 ## Access rules
 
-Reading is open: the overview, the history and the export of approved boxes need no login, in line with the open-data goal of the project. Writing needs either the box secret (uploads) or the admin password (approval, names, intervals, calibrations). Boxes that are pending or blocked are visible only to the administrator. Whether the dashboard should stay open on a public host is still to be decided.
+Reading is open: the overview, the history and the export of approved boxes need no login, in line with the open-data goal of the project. Writing needs either the box secret (uploads) or the admin password (approval, names, intervals, calibrations). Boxes that are pending or blocked are visible only to the administrator. Reading stays open on the public host as well (decided by Nicolas on 2026-10-28).
 
 ## Not done yet
 
-Deployment on Uberspace (web backend, supervisord service), backups of the database, several administrator accounts, deleting data, and a guided calibration workflow that waits for a stable reading.
+The actual deployment on Uberspace (the guide is written but untested), a consistent daily copy of the database, several administrator accounts, deleting data, and a guided calibration workflow that waits for a stable reading.

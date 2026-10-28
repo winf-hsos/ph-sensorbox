@@ -1,7 +1,8 @@
 """HTTP API and dashboard of the pH Sensor Box server.
 
 Run locally:  uvicorn phbox_server.main:create_app --factory --port 8000
-Settings come from the environment: PHBOX_DB (SQLite file) and PHBOX_ADMIN_PASSWORD.
+Settings come from the environment: PHBOX_DB (SQLite file) and PHBOX_ADMIN_PASSWORD
+or PHBOX_ADMIN_PASSWORD_FILE (a file holding the password).
 """
 import asyncio
 import csv
@@ -94,6 +95,9 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
     db_path = db_path or os.environ.get("PHBOX_DB", "phbox.sqlite3")
     if admin_password is None:
         admin_password = os.environ.get("PHBOX_ADMIN_PASSWORD")
+    if admin_password is None and os.environ.get("PHBOX_ADMIN_PASSWORD_FILE"):
+        # keeps the password out of service definitions and process listings
+        admin_password = Path(os.environ["PHBOX_ADMIN_PASSWORD_FILE"]).read_text().strip()
     con = db.connect(db_path)
     hub = Hub()
     app = FastAPI(title="pH Sensor Box server")

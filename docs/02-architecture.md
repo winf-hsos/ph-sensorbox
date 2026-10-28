@@ -68,7 +68,7 @@ How much the radio can really be switched off without breaking NTP, updates and 
 
 ## 2. Transport
 
-HTTPS with JSON batches from the box to the server. MQTT was considered, but on Uberspace only ports 80 and 443 are open from outside by default; direct TCP services need one of up to 20 ports in the range 40,000 to 61,000 ([Uberspace firewall ports](https://manual.uberspace.de/basics-ports/)). HTTPS through the web frontend needs no extra port and usually passes through restrictive networks.
+HTTPS with JSON batches from the box to the server. MQTT was considered, but on Uberspace an application is reached through the web frontend, which terminates HTTPS and forwards to the application's port ([Uberspace 8 web backends](https://u8manual.uberspace.de/web_backends/)); HTTPS therefore needs no extra port and usually passes through restrictive networks, whereas a broker would need a separate port. (The Uberspace 7 manual named a quota of 20 extra TCP ports; whether Uberspace 8 offers them was not checked.)
 
 One requirement on the lab network follows from this: the IoT Wi-Fi must allow outbound HTTPS to the internet, which has to be confirmed with the IT department, because IoT networks are sometimes isolated.
 
@@ -87,7 +87,7 @@ Sketch of one batch (proposal):
 
 ## 3. The server
 
-A web application that runs as a [web backend on Uberspace](https://manual.uberspace.de/web-backends): the application listens on a port, Uberspace terminates HTTPS and forwards the requests, and WebSockets are passed through; idle connections are closed after three minutes, so a live view needs keep-alive messages.
+A web application that runs as a [web backend on Uberspace 8](https://u8manual.uberspace.de/web_backends/) on the shared Asteroid `hsos`, under its own subdomain: the application listens on a port, Uberspace terminates HTTPS and forwards the requests, and idle connections are closed after three minutes, so the live view (server-sent events) sends a keep-alive every 30 s. The setup is described in `07-deployment-uberspace.md`.
 
 | Part | Task |
 |---|---|
@@ -130,4 +130,4 @@ Per calibration event: box, probe, time, buffer values, buffer temperatures, mea
 - Whether the pH probe and the thermocouple disturb each other in a well-conducting solution; in tap water there was no measurable effect (`05-bench-log.md`).
 - How long the electrode needs to settle after it is moved; in the water test it was still drifting by 4 mV per minute after nine minutes, which the firmware and the calibration workflow have to take into account (for example a stability criterion before a calibration point is accepted).
 - Whether the IoT Wi-Fi allows outbound HTTPS.
-- Language, framework and database of the server; how the Uberspace account is provided.
+- Access to the Uberspace Asteroid `hsos`, which Nicolas has not handed over yet.
