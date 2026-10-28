@@ -1,0 +1,36 @@
+# pH Sensor Box server
+
+The central server of the pH Sensor Box: boxes register here and upload their raw readings, an administrator approves them and enters calibrations, and everyone with access sees a live dashboard and can export the data. The design is described in `../docs/02-architecture.md`, the box protocol in `../docs/06-box-protocol.md`.
+
+Python, FastAPI and SQLite; the dashboard is plain HTML and JavaScript without a build step, in German and English.
+
+## Run locally
+
+```bash
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt     # on Linux: .venv/bin/python
+PHBOX_ADMIN_PASSWORD=choose-one .venv/Scripts/python -m uvicorn phbox_server.main:create_app --factory --port 8000
+```
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `PHBOX_DB` | path of the SQLite file | `phbox.sqlite3` in the working directory |
+| `PHBOX_ADMIN_PASSWORD` | password of the user `admin` for `/admin` and the admin API | none; admin functions are disabled without it |
+
+Pages: `/` overview of all approved boxes, `/box?id=…` history and calibrations of one box, `/admin` approval, names, intervals and calibration entry (HTTP basic auth, user `admin`). The API is listed at `/docs`.
+
+To feed it with real data from the bench, run `../tools/bench_box.py`, which reads the Bricklets through a Brick Daemon and behaves like a box; approve the box `bench` under `/admin` afterwards.
+
+## Tests
+
+```bash
+.venv/Scripts/python -m pytest
+```
+
+## Access rules
+
+Reading is open: the overview, the history and the export of approved boxes need no login, in line with the open-data goal of the project. Writing needs either the box secret (uploads) or the admin password (approval, names, intervals, calibrations). Boxes that are pending or blocked are visible only to the administrator. Whether the dashboard should stay open on a public host is still to be decided.
+
+## Not done yet
+
+Deployment on Uberspace (web backend, supervisord service), backups of the database, several administrator accounts, deleting data, and a guided calibration workflow that waits for a stable reading.

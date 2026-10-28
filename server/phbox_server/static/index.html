@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pH-Sensorbox</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1 data-t="title">pH-Sensorbox</h1>
+    <nav><a href="/" class="active" data-t="overview">Übersicht</a><a href="/admin" data-t="admin">Verwaltung</a></nav>
+    <button id="lang">EN</button>
+  </header>
+  <main>
+    <div id="boxes" class="grid"></div>
+  </main>
+  <script src="/static/app.js"></script>
+  <script>
+    const boxes = new Map();
+
+    function card(box) {
+      const last = box.last;
+      const cal = last && last.calibration_id != null;
+      return `<a class="card" href="/box?id=${encodeURIComponent(box.id)}">
+        <h2><span class="dot ${contactState(box)}"></span>${esc(box.name || box.id)}</h2>
+        <div class="muted">${esc(box.location || "")}</div>
+        <div class="ph">${fmt.ph(last?.ph)} <small>pH</small></div>
+        <div class="row">
+          <span>${fmt.temp(last?.temp_c)}</span>
+          <span class="muted">${fmt.mv(last?.mv)}</span>
+          <span class="tag ${cal ? "" : "uncal"}">${t(cal ? "calibrated" : "uncalibrated")}</span>
+        </div>
+        <div class="muted">${t("lastContact")}: ${fmt.ago(box.last_seen)}</div>
+      </a>`;
+    }
+
+    function render() {
+      const el = document.getElementById("boxes");
+      el.innerHTML = boxes.size
+        ? [...boxes.values()].map(card).join("")
+        : `<div class="empty" data-t="noBoxes">${t("noBoxes")}</div>`;
+    }
+
+    async function load() {
+      boxes.clear();
+      for (const box of await api("/api/v1/boxes")) boxes.set(box.id, box);
+      render();
+    }
+
+    initPage(render);
+    load();
+    live({
+      reading(r) {
+        const box = boxes.get(r.box);
+        if (!box) return load();
+        box.last = r;
+        box.last_seen = new Date().toISOString();
+        render();
+      },
+      box: () => load(),
+    });
+    setInterval(render, 10000); // keep "last contact" fresh
+  </script>
+</body>
+</html>

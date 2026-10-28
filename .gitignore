@@ -6,3 +6,9 @@ venv/
 *.log
 .DS_Store
 Thumbs.db
+
+# local server data and bench box secrets
+*.sqlite3
+*.sqlite3-*
+tools/.*.secret
+server/.admin_password

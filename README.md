@@ -6,15 +6,18 @@ Commercial lab pH meters are expensive and give only limited access to their dat
 
 ## Status
 
-Planning. Nothing is built yet; the open questions (probe and amplifier, resolution, temperature compensation, calibration, data access) are worked out in `docs/`.
+Early development. The bench setup (Atlas analog pH board and thermocouple on Tinkerforge Bricklets) delivers readings, and a first version of the central server with registration, live dashboard, calibration and export runs locally. Firmware for the ESP32 Brick and the enclosure are not started yet.
 
 ## Layout
 
 | Folder | Content |
 |---|---|
-| `docs/` | Concept, component choices, architecture |
+| `docs/` | Concept, component choices, architecture, box protocol, bench log |
+| `server/` | Central server: API, dashboard, calibration (Python, FastAPI, SQLite) |
+| `tools/` | Bench scripts: list devices, read sensors, act as a box, analyse steps |
+| `data/` | Raw data of bench tests |
 
-Firmware, software and enclosure files follow once the design is settled.
+Firmware and enclosure files follow.
 
 ## License
 

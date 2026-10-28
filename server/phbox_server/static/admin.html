@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pH-Sensorbox</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1 data-t="title">pH-Sensorbox</h1>
+    <nav><a href="/" data-t="overview">Übersicht</a><a href="/admin" class="active" data-t="admin">Verwaltung</a></nav>
+    <button id="lang">EN</button>
+  </header>
+  <main>
+    <section>
+      <h2 data-t="boxes">Boxen</h2>
+      <div class="card"><table id="boxes"></table></div>
+    </section>
+
+    <section>
+      <h2 data-t="addCalibration">Kalibrierung eintragen</h2>
+      <div class="card">
+        <p class="muted" data-t="calHint"></p>
+        <div class="toolbar">
+          <span data-t="box">Box</span> <select id="calBox"></select>
+          <span data-t="probe">Sonde</span> <input id="calProbe" style="width:200px">
+        </div>
+        <table id="calPoints"></table>
+        <div class="toolbar" style="margin-top:10px">
+          <button class="primary" id="calSave" data-t="saveCalibration">Kalibrierung speichern</button>
+          <span id="msg" class="muted"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+  <script>
+    let boxes = [];
+    const BUFFERS = [4.01, 7.0, 10.01];
+
+    function renderBoxes() {
+      const el = document.getElementById("boxes");
+      el.innerHTML = `<tr><th></th><th>ID</th><th>${t("status")}</th><th>${t("name")}</th><th>${t("location")}</th>
+        <th>${t("intervals")}</th><th></th></tr>` + boxes.map((b) => `<tr data-id="${esc(b.id)}">
+        <td><span class="dot ${contactState(b)}"></span></td>
+        <td>${esc(b.id)}<br><span class="muted">${esc(b.firmware || "")}</span></td>
+        <td>${t(b.status)}<br><span class="muted">${fmt.ago(b.last_seen)}</span></td>
+        <td><input name="name" value="${esc(b.name || "")}"></td>
+        <td><input name="location" value="${esc(b.location || "")}"></td>
+        <td><input name="sample_interval_s" type="number" min="1" value="${b.sample_interval_s}" style="width:70px">
+            <input name="upload_interval_s" type="number" min="5" value="${b.upload_interval_s}" style="width:70px"></td>
+        <td><button data-act="save">${t("save")}</button>
+            ${b.status !== "approved" ? `<button class="primary" data-act="approved">${t("approve")}</button>` : ""}
+            ${b.status !== "blocked" ? `<button class="danger" data-act="blocked">${t("block")}</button>` : ""}</td>
+      </tr>`).join("");
+    }
+
+    function renderCalBoxes() {
+      const select = document.getElementById("calBox");
+      const current = select.value;
+      select.innerHTML = boxes.filter((b) => b.status === "approved")
+        .map((b) => `<option value="${esc(b.id)}">${esc(b.name || b.id)}</option>`).join("");
+      if (current) select.value = current;
+    }
+
+    // Rendered only at start and on a language change, so typed values survive live updates.
+    function renderCalPoints() {
+      document.getElementById("calPoints").innerHTML =
+        `<tr><th>${t("bufferPh")}</th><th>${t("voltage")} [mV]</th><th>${t("temperature")} [°C]</th><th></th></tr>` +
+        BUFFERS.map((ph, i) => `<tr data-i="${i}">
+          <td><input name="ph" type="number" step="0.01" value="${ph}"></td>
+          <td><input name="mv" type="number" step="0.1"></td>
+          <td><input name="temp" type="number" step="0.1"></td>
+          <td><button data-act="current">${t("useCurrent")}</button></td></tr>`).join("");
+    }
+
+    async function load() {
+      boxes = await api("/api/v1/admin/boxes");
+      renderBoxes();
+      renderCalBoxes();
+    }
+
+    document.getElementById("boxes").addEventListener("click", async (e) => {
+      const act = e.target.dataset.act;
+      if (!act) return;
+      const tr = e.target.closest("tr");
+      const body = {};
+      tr.querySelectorAll("input").forEach((input) => {
+        body[input.name] = input.type === "number" ? +input.value : input.value;
+      });
+      if (act !== "save") body.status = act;
+      await api(`/api/v1/boxes/${encodeURIComponent(tr.dataset.id)}`, { method: "PATCH", body: JSON.stringify(body) });
+      await load();
+    });
+
+    document.getElementById("calPoints").addEventListener("click", async (e) => {
+      if (e.target.dataset.act !== "current") return;
+      const tr = e.target.closest("tr");
+      const box = boxes.find((b) => b.id === document.getElementById("calBox").value);
+      const fresh = (await api("/api/v1/admin/boxes")).find((b) => b.id === box?.id);
+      if (!fresh?.last) return;
+      tr.querySelector("[name=mv]").value = fresh.last.mv.toFixed(1);
+      tr.querySelector("[name=temp]").value = fresh.last.temp_c?.toFixed(2) ?? "";
+    });
+
+    document.getElementById("calSave").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      const points = [...document.querySelectorAll("#calPoints tr[data-i]")]
+        .map((tr) => ["ph", "mv", "temp"].map((n) => tr.querySelector(`[name=${n}]`).value))
+        .filter((p) => p.every((v) => v !== ""))
+        .map((p) => p.map(Number));
+      try {
+        const result = await api(`/api/v1/boxes/${encodeURIComponent(document.getElementById("calBox").value)}/calibrations`,
+          { method: "POST", body: JSON.stringify({ probe: document.getElementById("calProbe").value || null, points }) });
+        msg.textContent = `${t("saved")} ${t("slope")}: ${result.slope_mv_per_ph.toFixed(1)} mV/pH (${result.slope_percent} %), ` +
+          `${t("offset")}: ${result.offset_mv.toFixed(1)} mV`;
+      } catch (error) {
+        msg.textContent = error.message;
+      }
+    });
+
+    initPage(() => { renderBoxes(); renderCalPoints(); });
+    renderCalPoints();
+    load();
+    live({ box: () => load() });
+  </script>
+</body>
+</html>

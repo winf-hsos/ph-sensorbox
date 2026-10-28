@@ -119,7 +119,7 @@ Per calibration event: box, probe, time, buffer values, buffer temperatures, mea
 | Phase | Content | State |
 |---|---|---|
 | 0 | Bench test with a Master Brick on USB and Python scripts: noise, calibration, temperature, interference | readout works (`05-bench-log.md`); calibration waits for buffers |
-| 1 | Server skeleton (ingest, registration, simple dashboard) and a box firmware that uploads raw readings | not started |
+| 1 | Server skeleton (ingest, registration, simple dashboard) and a box firmware that uploads raw readings | server runs locally (`server/`, protocol in `06-box-protocol.md`), fed by `tools/bench_box.py` with real readings; firmware and Uberspace deployment not started |
 | 2 | Power measurement, radio-off operation, display, enclosure | not started |
 | 3 | Calibration workflow in the dashboard, export, documentation for rebuilders | not started |
 
