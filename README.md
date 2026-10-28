@@ -21,4 +21,4 @@ Firmware and enclosure files follow.
 
 ## License
 
-Not decided yet.
+MIT, see `LICENSE`: the code, documentation and data may be used, changed and passed on, also commercially, as long as the copyright notice stays with them. The typeface Instrument Sans in `server/phbox_server/static/fonts/` keeps its own SIL Open Font License.

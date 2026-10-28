@@ -36,4 +36,4 @@ Reading is open: the overview, the history and the export of approved boxes need
 
 ## Not done yet
 
-The actual deployment on Uberspace (the guide is written but untested), a consistent daily copy of the database, several administrator accounts, deleting data, and a guided calibration workflow that waits for a stable reading.
+Automatic updates of the Uberspace deployment from GitHub, a consistent daily copy of the database, several administrator accounts, deleting data, and a guided calibration workflow that waits for a stable reading.
