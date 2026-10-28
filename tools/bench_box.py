@@ -9,6 +9,10 @@ confirmed, and take the intervals from the server's answer.
 Each record holds the median of its samples, which drops single spikes from touching
 the setup (see docs/05-bench-log.md).
 
+If the Brick is unplugged, the script keeps running: it drops the samples of the
+interrupted record, keeps uploading the backlog and resumes measuring once the Brick
+answers again, so the outage shows up as a gap in the data.
+
 Usage: bench_box.py [--server URL] [--box ID] [--host H] [--port P]
                     [--analog-uid UID] [--tc-uid UID]
 """
@@ -24,6 +28,7 @@ from pathlib import Path
 
 from tinkerforge.bricklet_analog_in_v3 import BrickletAnalogInV3
 from tinkerforge.bricklet_thermocouple_v2 import BrickletThermocoupleV2
+from tinkerforge.ip_connection import Error as TinkerforgeError
 from tinkerforge.ip_connection import IPConnection
 
 FIRMWARE = "bench-box 0.1"
@@ -78,15 +83,29 @@ tc = BrickletThermocoupleV2(args.tc_uid, ipcon)
 
 backlog, voltages, temperatures = [], [], []
 record_due = upload_due = time.monotonic()
+brick_lost = False
 try:
     while True:
-        voltages.append(analog.get_voltage())
-        over_under, open_circuit = tc.get_error_state()
-        if not (over_under or open_circuit):
-            temperatures.append(tc.get_temperature() / 100)
+        try:
+            voltage = analog.get_voltage()
+            over_under, open_circuit = tc.get_error_state()
+            temperature = None if over_under or open_circuit else tc.get_temperature() / 100
+        except TinkerforgeError as error:
+            if not brick_lost:
+                log(f"Brick not reachable ({error}); retrying, backlog {len(backlog)} kept")
+                brick_lost = True
+                voltages, temperatures = [], []  # do not let a record span the gap
+        else:
+            if brick_lost:
+                log("Brick is back, measuring again")
+                brick_lost = False
+                record_due = time.monotonic()
+            voltages.append(voltage)
+            if temperature is not None:
+                temperatures.append(temperature)
 
         now = time.monotonic()
-        if now >= record_due + config["sample_interval_s"]:
+        if voltages and now >= record_due + config["sample_interval_s"]:
             record_due = now
             stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             backlog.append({"t": stamp, "mv": statistics.median(voltages),
