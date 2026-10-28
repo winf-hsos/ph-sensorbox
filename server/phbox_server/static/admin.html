@@ -18,12 +18,12 @@
     <section class="block" id="pendingBlock" hidden>
       <h2 id="pendingTitle"></h2>
       <p class="muted" id="pendingHint"></p>
-      <div class="table-wrap"><table id="pending"></table></div>
+      <div class="table-wrap"><table id="pending" class="stack"></table></div>
     </section>
 
     <section class="block">
       <h2 id="boxesTitle"></h2>
-      <div class="table-wrap"><table id="boxes"></table></div>
+      <div class="table-wrap"><table id="boxes" class="stack"></table></div>
     </section>
 
     <section class="block">
@@ -58,8 +58,9 @@
       $("pending").replaceChildren(
         h("tr", {}, h("th", {}, "ID"), h("th", {}, "Firmware"), h("th", {}, t("lastReading")), h("th", {})),
         ...pending.map((b) => h("tr", {},
-          h("td", {}, h("b", {}, b.id)), h("td", {}, b.firmware || "–"), h("td", {}, fmt.ago(b.last_seen)),
-          h("td", {}, h("div", { class: "row-actions" },
+          h("td", { "data-label": "ID" }, h("b", {}, b.id)), h("td", { "data-label": "Firmware" }, b.firmware || "–"),
+          h("td", { "data-label": t("lastReading") }, fmt.ago(b.last_seen)),
+          h("td", { class: "wide" }, h("div", { class: "row-actions" },
             h("button", { class: "button primary", type: "button", onclick: () => patch(b.id, { status: "approved" }) }, t("approve")),
             h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")))))));
     }
@@ -81,11 +82,13 @@
             sample_interval_s: Number(fields.sample_interval_s.value), upload_interval_s: Number(fields.upload_interval_s.value),
           });
           return h("tr", {},
-            h("td", {}, b.id, h("div", { class: "muted" }, b.firmware || "")),
-            h("td", {}, h("span", { class: "status", "data-state": b.status === "approved" ? contactState(b) : "none" }, t(b.status))),
-            h("td", {}, fields.name), h("td", {}, fields.location),
-            h("td", { style: "width:120px" }, fields.sample_interval_s), h("td", { style: "width:120px" }, fields.upload_interval_s),
-            h("td", {}, h("div", { class: "row-actions" },
+            h("td", { "data-label": "ID" }, b.id, h("div", { class: "muted" }, b.firmware || "")),
+            h("td", { "data-label": t("status") }, h("span", { class: "status", "data-state": b.status === "approved" ? contactState(b) : "none" }, t(b.status))),
+            h("td", { class: "wide", "data-label": t("name") }, fields.name),
+            h("td", { class: "wide", "data-label": t("location") }, fields.location),
+            h("td", { style: "width:120px", "data-label": t("sampleInterval") }, fields.sample_interval_s),
+            h("td", { style: "width:120px", "data-label": t("uploadInterval") }, fields.upload_interval_s),
+            h("td", { class: "wide" }, h("div", { class: "row-actions" },
               h("button", { class: "button", type: "button", onclick: save }, t("save")),
               b.status === "blocked"
                 ? h("button", { class: "button", type: "button", onclick: () => patch(b.id, { status: "approved" }) }, t("unblock"))
@@ -128,10 +131,11 @@
       h("div", { class: "controls" },
         h("label", {}, t("box"), " ", cal.box),
         h("label", { style: "flex:1; min-width:220px" }, t("probe"), " ", cal.probe)),
-      h("div", { class: "table-wrap" }, h("table", {},
+      h("div", { class: "table-wrap" }, h("table", { class: "stack" },
         h("tr", {}, h("th", {}, t("bufferPh")), h("th", {}, `${t("voltage")} (mV)`), h("th", {}, `${t("temperature")} (°C)`), h("th", {})),
-        ...cal.rows.map((r) => h("tr", {}, h("td", {}, r.ph), h("td", {}, r.mv), h("td", {}, r.temp),
-          h("td", {}, h("button", { class: "button", type: "button", onclick: () => useCurrent(r) }, t("useCurrent"))))))),
+        ...cal.rows.map((r) => h("tr", {}, h("td", { "data-label": t("bufferPh") }, r.ph),
+          h("td", { "data-label": `${t("voltage")} (mV)` }, r.mv), h("td", { "data-label": `${t("temperature")} (°C)` }, r.temp),
+          h("td", { class: "wide" }, h("button", { class: "button", type: "button", onclick: () => useCurrent(r) }, t("useCurrent"))))))),
       h("div", { class: "controls" },
         h("button", { class: "button primary", type: "button", onclick: saveCalibration }, t("saveCalibration")), cal.message));
 

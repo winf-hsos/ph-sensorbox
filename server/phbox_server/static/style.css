@@ -552,4 +552,24 @@ details.values .table-wrap { margin-top: 10px; max-height: 360px; overflow-y: au
   .hero .readout { font-size: 84px; }
   .detail-head h1 { font-size: 30px; }
   .chart { height: 240px; }
+
+  /* admin tables become stacked blocks with a label above each field */
+  table.stack tr:first-child { display: none; }
+  table.stack tr {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px 12px;
+    padding: 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.stack tr:last-child { border-bottom: 0; }
+  table.stack td { display: block; padding: 0; border: 0; }
+  table.stack td.wide { grid-column: 1 / -1; }
+  table.stack td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
 }
