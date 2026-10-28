@@ -127,6 +127,7 @@ Per calibration event: box, probe, time, buffer values, buffer temperatures, mea
 
 - How the ESP32 Brick is reached over the network for the first firmware tests; over USB, `brickd` did not list it on 2026-10-28.
 - The real power consumption of the complete box, and whether common power banks keep it powered.
-- Whether the pH probe and the thermocouple disturb each other in the same vessel (see `01-components.md`, section 5).
+- Whether the pH probe and the thermocouple disturb each other in a well-conducting solution; in tap water there was no measurable effect (`05-bench-log.md`).
+- How long the electrode needs to settle after it is moved; in the water test it was still drifting by 4 mV per minute after nine minutes, which the firmware and the calibration workflow have to take into account (for example a stability criterion before a calibration point is accepted).
 - Whether the IoT Wi-Fi allows outbound HTTPS.
 - Language, framework and database of the server; how the Uberspace account is provided.

@@ -70,6 +70,7 @@ try:
         temps.append(temperature_c)
         if writer:
             writer.writerow([now, voltage_mv, f"{temperature_c:.2f}", open_circuit, over_under])
+            csv_file.flush()  # keep the file readable while a long run is still going
         time.sleep(args.interval)
 finally:
     ipcon.disconnect()

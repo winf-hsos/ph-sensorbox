@@ -76,7 +76,7 @@ Points to verify before relying on it:
 
 - **Probe type.** The "K" in the article number suggests type K **(inference)**; the type has to be set on the Bricklet to match.
 - **Accuracy.** If the ±0.15 % of full scale is meant over the whole type K span of roughly 1580 K, the absolute error would be about 2.4 K, which equals about 0.024 pH at pH 4 **(calculation under that assumption)**. That is irrelevant for ±0.1 pH and relevant for ±0.01 pH, so the first test is a comparison against a reference thermometer, with a software offset if needed.
-- **Electrical coupling.** A conductive probe sheath in the same solution as the electrode can inject noise into the high-impedance pH signal when the thermocouple junction is grounded **(inference)**. The isolated carrier board should break the loop, and a measurement in buffer solution with and without the thermocouple will show it.
+- **Electrical coupling.** A conductive probe sheath in the same solution as the electrode could shift the high-impedance pH signal when the thermocouple junction is grounded **(inference)**. A first test in tap water on 2026-10-28 found no measurable effect (0.2 mV, about 0.001 pH; `05-bench-log.md`); a repeat in a buffer or salt solution, which conducts much better, is still open.
 - **Chemistry.** The sheath material is unknown; for acidic or salty samples it has to be checked, and a coated or glass-sheathed probe may be necessary.
 - **Cold junction.** The Bricklet's cold-junction sensor sits on its board, so the Bricklet should be kept away from heat sources inside the box.
 
