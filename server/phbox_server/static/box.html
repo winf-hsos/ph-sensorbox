@@ -48,7 +48,7 @@
       <div class="table-wrap"><table id="valuesTable"></table></div>
     </details>
 
-    <section class="block">
+    <section class="block" id="calibrations">
       <h2 id="calTitle"></h2>
       <div id="cals"></div>
     </section>
@@ -111,12 +111,12 @@
       readout($("ph"), last?.ph);
       setScale(bigScale, last?.ph);
       const cal = box.calibrations.at(-1);
-      const calibrated = last && last.calibration_id != null;
+      const calibrated = Boolean(cal);
       $("facts").replaceChildren(
         h("dt", {}, t("temperature")), h("dd", { class: "num" }, fmt.temp(last?.temp_c)),
         h("dt", {}, t("voltage")), h("dd", { class: "num" }, fmt.mv(last?.mv)),
-        h("dt", {}, t("calibration")), h("dd", {}, h("span", { class: "tag", "data-kind": calibrated ? "cal" : "uncal" },
-          calibrated && cal ? `${t("calibrated")} ${t("calibratedOn", fmt.date(cal.t))}` : t("uncalibrated"))),
+        h("dt", {}, t("calibration")), h("dd", {}, h("a", { class: "tag", href: "#calibrations", "data-kind": calibrated ? "cal" : "uncal" },
+          calibrated ? `${t("calibrated")} ${t("calibratedOn", fmt.dateShortTime(cal.t))}` : t("uncalibrated"))),
         h("dt", {}, t("lastReading")), h("dd", {}, fmt.ago(last?.t)));
     }
 

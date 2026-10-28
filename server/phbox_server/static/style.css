@@ -231,6 +231,10 @@ button, select, input { font: inherit; color: inherit; }
   color: var(--ink-2);
 }
 
+a.tag { text-decoration: none; }
+
+a.tag:hover { color: var(--accent); }
+
 .tag[data-kind="uncal"]::before {
   content: "";
   width: 10px;
@@ -464,6 +468,12 @@ button, select, input { font: inherit; color: inherit; }
 section.block { margin: 34px 0; }
 
 section.block > h2 { font-size: 20px; font-weight: 600; font-stretch: 87.5%; margin: 0 0 12px; }
+
+.last-cal { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--rule); }
+
+.last-cal h3 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+
+.last-cal table { max-width: 480px; }
 
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; }
 

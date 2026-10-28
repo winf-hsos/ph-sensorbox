@@ -68,7 +68,7 @@
     function renderBoxes() {
       const known = boxes.filter((b) => b.status !== "pending");
       $("boxes").replaceChildren(
-        h("tr", {}, h("th", {}, "ID"), h("th", {}, t("status")), h("th", {}, t("name")), h("th", {}, t("location")),
+        h("tr", {}, h("th", {}, "ID"), h("th", {}, t("status")), h("th", {}, t("calibratedAt")), h("th", {}, t("name")), h("th", {}, t("location")),
           h("th", {}, t("sampleInterval")), h("th", {}, t("uploadInterval")), h("th", {})),
         ...known.map((b) => {
           const fields = {
@@ -84,6 +84,7 @@
           return h("tr", {},
             h("td", { "data-label": "ID" }, b.id, h("div", { class: "muted" }, b.firmware || "")),
             h("td", { "data-label": t("status") }, h("span", { class: "status", "data-state": b.status === "approved" ? contactState(b) : "none" }, t(b.status))),
+            h("td", { "data-label": t("calibratedAt") }, b.calibrated_at ? fmt.dateShortTime(b.calibrated_at) : t("never")),
             h("td", { class: "wide", "data-label": t("name") }, fields.name),
             h("td", { class: "wide", "data-label": t("location") }, fields.location),
             h("td", { style: "width:120px", "data-label": t("sampleInterval") }, fields.sample_interval_s),
@@ -96,36 +97,112 @@
         }));
     }
 
-    // Built once, so values typed into it survive live updates of the tables.
+    // Built once, so values typed into it survive live updates of the tables. Every
+    // change is kept on the server as a draft until the calibration is saved.
     const cal = {
       box: h("select", { class: "field", "aria-label": t("box") }),
       probe: h("input", { class: "field", "aria-label": t("probe") }),
-      rows: BUFFERS.map((ph) => ({
-        ph: h("input", { class: "field num", type: "number", step: "0.01", value: ph, "aria-label": t("bufferPh") }),
+      rows: BUFFERS.map(() => ({
+        ph: h("input", { class: "field num", type: "number", step: "0.01", "aria-label": t("bufferPh") }),
         mv: h("input", { class: "field num", type: "number", step: "0.1", "aria-label": t("voltage") }),
         temp: h("input", { class: "field num", type: "number", step: "0.1", "aria-label": t("temperature") }),
+        taken: null,
+        takenText: h("span", { class: "muted" }),
       })),
       message: h("p", { class: "message", role: "status" }),
+      last: h("div", { class: "last-cal" }),
     };
+    const calUrl = (path) => `/api/v1/boxes/${encodeURIComponent(cal.box.value)}/${path}`;
+    const numberOrNull = (input) => (input.value === "" ? null : Number(input.value));
+
+    function fillForm(draft) {
+      cal.probe.value = draft?.probe ?? "";
+      cal.rows.forEach((r, i) => {
+        const p = draft?.points?.[i];
+        r.ph.value = p?.ph ?? BUFFERS[i];
+        r.mv.value = p?.mv ?? "";
+        r.temp.value = p?.temp_c ?? "";
+        r.taken = p?.t ?? null;
+        r.takenText.textContent = r.taken ? t("taken", fmt.time(r.taken)) : "";
+      });
+    }
+
+    async function loadDraft() {
+      cal.message.textContent = "";
+      if (!cal.box.value) return;
+      const draft = await api(calUrl("calibration-draft"));
+      fillForm(draft);
+      if (draft) cal.message.textContent = t("draftLoaded", fmt.dateShortTime(draft.updated_at));
+    }
+
+    async function saveDraft() {
+      const draft = await api(calUrl("calibration-draft"), { method: "PUT", body: JSON.stringify({
+        probe: cal.probe.value || null,
+        points: cal.rows.map((r) => ({ ph: numberOrNull(r.ph), mv: numberOrNull(r.mv), temp_c: numberOrNull(r.temp), t: r.taken })),
+      }) });
+      cal.message.textContent = t("draftSaved", fmt.time(draft.updated_at));
+    }
 
     async function useCurrent(row) {
       const fresh = (await api("/api/v1/admin/boxes")).find((b) => b.id === cal.box.value);
       if (!fresh?.last) return;
       row.mv.value = fresh.last.mv.toFixed(1);
       row.temp.value = fresh.last.temp_c?.toFixed(2) ?? "";
+      row.taken = fresh.last.t;
+      row.takenText.textContent = t("taken", fmt.time(row.taken));
+      await saveDraft();
+    }
+
+    function edited(row) {
+      row.taken = null; // typed by hand, not taken from the box
+      row.takenText.textContent = "";
+      saveDraft();
+    }
+
+    async function startOver() {
+      await api(calUrl("calibration-draft"), { method: "DELETE" });
+      fillForm(null);
+      cal.message.textContent = "";
+    }
+
+    async function renderLastCal() {
+      if (!cal.box.value) { cal.last.replaceChildren(); return; }
+      const box = await api(`/api/v1/boxes/${encodeURIComponent(cal.box.value)}`);
+      const c = box.calibrations.at(-1);
+      if (!c) { cal.last.replaceChildren(h("h3", {}, t("lastCalibration")), h("p", { class: "muted" }, t("notCalibrated"))); return; }
+      cal.last.replaceChildren(
+        h("h3", {}, t("lastCalibration")),
+        h("p", {}, fmt.dateShortTime(c.t), c.probe ? `, ${t("probe")} ${c.probe}` : "", ". ",
+          `${t("slope")} ${fmt.number(c.slope_mv_per_ph, 1)} mV/pH (${fmt.number(c.slope_percent, 1)} %), ${t("offset")} ${fmt.mv(c.offset_mv)}.`),
+        h("div", { class: "table-wrap" }, h("table", { class: "stack" },
+          h("tr", {}, h("th", { class: "num" }, t("bufferPh")), h("th", { class: "num" }, t("voltage")), h("th", { class: "num" }, t("temperature"))),
+          ...c.points.map(([ph, mv, temp]) => h("tr", {},
+            h("td", { class: "num", "data-label": t("bufferPh") }, fmt.number(ph, 2)),
+            h("td", { class: "num", "data-label": t("voltage") }, fmt.mv(mv)),
+            h("td", { class: "num", "data-label": t("temperature") }, fmt.temp(temp)))))),
+        h("p", {}, h("a", { href: `/box?id=${encodeURIComponent(box.id)}#calibrations` }, t("allCalibrations"))));
     }
 
     async function saveCalibration() {
       const points = cal.rows.map((r) => [r.ph.value, r.mv.value, r.temp.value])
         .filter((p) => p.every((v) => v !== "")).map((p) => p.map(Number));
+      if (points.length < 2) { cal.message.textContent = t("needTwo"); return; }
       try {
-        const result = await api(`/api/v1/boxes/${encodeURIComponent(cal.box.value)}/calibrations`,
+        const result = await api(calUrl("calibrations"),
           { method: "POST", body: JSON.stringify({ probe: cal.probe.value || null, points }) });
+        fillForm(null); // the server has dropped the draft
         cal.message.textContent = t("calSaved", `${fmt.number(result.slope_mv_per_ph, 1)} mV/pH (${fmt.number(result.slope_percent, 1)} %)`, fmt.mv(result.offset_mv));
+        renderLastCal();
+        load();
       } catch (error) {
         cal.message.textContent = error.message;
       }
     }
+
+    cal.probe.addEventListener("change", saveDraft);
+    cal.rows.forEach((r) => [r.ph, r.mv, r.temp].forEach((input) => input.addEventListener("change", () => edited(r))));
+    cal.box.addEventListener("change", () => { loadDraft(); renderLastCal(); });
+    fillForm(null);
 
     $("calForm").append(
       h("div", { class: "controls" },
@@ -135,9 +212,12 @@
         h("tr", {}, h("th", {}, t("bufferPh")), h("th", {}, `${t("voltage")} (mV)`), h("th", {}, `${t("temperature")} (°C)`), h("th", {})),
         ...cal.rows.map((r) => h("tr", {}, h("td", { "data-label": t("bufferPh") }, r.ph),
           h("td", { "data-label": `${t("voltage")} (mV)` }, r.mv), h("td", { "data-label": `${t("temperature")} (°C)` }, r.temp),
-          h("td", { class: "wide" }, h("button", { class: "button", type: "button", onclick: () => useCurrent(r) }, t("useCurrent"))))))),
+          h("td", { class: "wide" }, h("div", { class: "row-actions" },
+            h("button", { class: "button", type: "button", onclick: () => useCurrent(r) }, t("useCurrent")), r.takenText)))))),
       h("div", { class: "controls" },
-        h("button", { class: "button primary", type: "button", onclick: saveCalibration }, t("saveCalibration")), cal.message));
+        h("button", { class: "button primary", type: "button", onclick: saveCalibration }, t("saveCalibration")),
+        h("button", { class: "button", type: "button", onclick: startOver }, t("startOver")), cal.message),
+      cal.last);
 
     function renderCalBoxes() {
       const current = cal.box.value;
@@ -145,6 +225,7 @@
       cal.box.replaceChildren(...approved.map((b) => h("option", { value: b.id }, b.name || b.id)));
       if (approved.some((b) => b.id === current)) cal.box.value = current;
       if (!approved.length) cal.message.textContent = t("noApproved");
+      if (cal.box.value !== current) { loadDraft(); renderLastCal(); } // first load or box gone
     }
 
     async function load() {

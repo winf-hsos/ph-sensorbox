@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS calibrations (
     temp_c REAL NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS calibration_drafts (
+    box_id TEXT PRIMARY KEY REFERENCES boxes(id),
+    draft_json TEXT NOT NULL,     -- {"probe": ..., "points": [{"ph", "mv", "temp_c", "t"}, ...]}
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -143,3 +148,26 @@ def calibrations(con, box_id):
     return con.execute(
         "SELECT * FROM calibrations WHERE box_id = ? ORDER BY t", (box_id,)
     ).fetchall()
+
+
+def get_draft(con, box_id):
+    return con.execute(
+        "SELECT draft_json, updated_at FROM calibration_drafts WHERE box_id = ?", (box_id,)
+    ).fetchone()
+
+
+def set_draft(con, box_id, draft) -> str:
+    updated = now_utc()
+    con.execute(
+        "INSERT INTO calibration_drafts (box_id, draft_json, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT (box_id) DO UPDATE SET draft_json = excluded.draft_json, "
+        "updated_at = excluded.updated_at",
+        (box_id, json.dumps(draft), updated),
+    )
+    con.commit()
+    return updated
+
+
+def delete_draft(con, box_id):
+    con.execute("DELETE FROM calibration_drafts WHERE box_id = ?", (box_id,))
+    con.commit()

@@ -71,6 +71,19 @@ class CalibrationIn(BaseModel):
     points: list[tuple[float, float, float]] = Field(min_length=2, max_length=10)
 
 
+class DraftPoint(BaseModel):
+    ph: float | None = None
+    mv: float | None = None
+    temp_c: float | None = None
+    t: datetime | None = None  # when the value was taken from the box
+
+
+class DraftIn(BaseModel):
+    """A calibration in progress: buffers measured so far, some of them still empty."""
+    probe: str | None = Field(None, max_length=80)
+    points: list[DraftPoint] = Field(max_length=10)
+
+
 class Hub:
     """Fan-out of live events to all open dashboard streams."""
 
@@ -163,9 +176,18 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
         out = {k: box[k] for k in ("id", "status", "name", "location", "firmware", "created_at",
                                     "last_seen", "sample_interval_s", "upload_interval_s")}
         if with_last:
+            times, cals = calibrations_of(box["id"])
             last = db.last_reading(con, box["id"])
-            out["last"] = reading_out(last, *calibrations_of(box["id"])) if last else None
+            out["last"] = reading_out(last, times, cals) if last else None
+            out["calibrated_at"] = times[-1] if times else None
         return out
+
+    def calibration_out(row) -> dict:
+        cal = Calibration(row["offset_mv"], row["slope_mv_per_ph"], row["temp_c"])
+        return {"id": row["id"], "t": row["t"], "probe": row["probe"],
+                "points": json.loads(row["points_json"]), "offset_mv": row["offset_mv"],
+                "slope_mv_per_ph": row["slope_mv_per_ph"], "temp_c": row["temp_c"],
+                "slope_percent": round(slope_percent(cal), 1)}
 
     def config_for(box) -> dict:
         """What a box gets back on every call: its state, intervals and current calibration."""
@@ -232,14 +254,7 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
         if box["status"] != "approved":
             raise HTTPException(404, "unknown box")
         out = box_out(box)
-        out["calibrations"] = [
-            {"id": r["id"], "t": r["t"], "probe": r["probe"], "points": json.loads(r["points_json"]),
-             "offset_mv": r["offset_mv"], "slope_mv_per_ph": r["slope_mv_per_ph"],
-             "temp_c": r["temp_c"],
-             "slope_percent": round(slope_percent(Calibration(r["offset_mv"], r["slope_mv_per_ph"],
-                                                              r["temp_c"])), 1)}
-            for r in db.calibrations(con, box_id)
-        ]
+        out["calibrations"] = [calibration_out(r) for r in db.calibrations(con, box_id)]
         return out
 
     @app.get("/api/v1/boxes/{box_id}/readings")
@@ -328,9 +343,35 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
             raise HTTPException(422, str(error))
         t = db.iso(body.t) if body.t else db.now_utc()
         cal_id = db.add_calibration(con, box_id, t, body.probe, [list(p) for p in body.points], cal)
+        db.delete_draft(con, box_id)  # the draft has become a calibration
         return {"id": cal_id, "t": t, "offset_mv": cal.offset_mv,
                 "slope_mv_per_ph": cal.slope_mv_per_ph, "temp_c": cal.temp_c,
                 "slope_percent": round(slope_percent(cal), 1)}
+
+    # A calibration is measured buffer by buffer, often with breaks for rinsing and
+    # changing the solution, so the values taken so far are kept on the server.
+    @app.get("/api/v1/boxes/{box_id}/calibration-draft", dependencies=[Depends(require_admin)])
+    async def get_draft(box_id: str):
+        box_or_404(box_id)
+        row = db.get_draft(con, box_id)
+        return {**json.loads(row["draft_json"]), "updated_at": row["updated_at"]} if row else None
+
+    @app.put("/api/v1/boxes/{box_id}/calibration-draft", dependencies=[Depends(require_admin)])
+    async def put_draft(box_id: str, body: DraftIn):
+        box_or_404(box_id)
+        try:
+            points = [{"ph": p.ph, "mv": p.mv, "temp_c": p.temp_c, "t": db.iso(p.t) if p.t else None}
+                      for p in body.points]
+        except ValueError as error:  # a capture time without time zone
+            raise HTTPException(422, str(error))
+        draft = {"probe": body.probe, "points": points}
+        return {**draft, "updated_at": db.set_draft(con, box_id, draft)}
+
+    @app.delete("/api/v1/boxes/{box_id}/calibration-draft", dependencies=[Depends(require_admin)])
+    async def delete_draft(box_id: str):
+        box_or_404(box_id)
+        db.delete_draft(con, box_id)
+        return {"ok": True}
 
     # --- pages -------------------------------------------------------------------------
 

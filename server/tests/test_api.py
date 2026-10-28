@@ -72,6 +72,26 @@ def test_calibration_applies_from_its_time_on(approved):
     assert upload(approved, []).json()["calibration"]["id"] == r.json()["id"]
 
 
+def test_calibration_draft_survives_until_the_calibration_is_saved(approved):
+    url = "/api/v1/boxes/box1/calibration-draft"
+    assert approved.get(url).status_code == 401
+    assert approved.get(url, auth=ADMIN).json() is None
+    draft = {"probe": "test probe", "points": [
+        {"ph": 4.01, "mv": 2000.0, "temp_c": 25.0, "t": "2026-10-28T09:00:00Z"},
+        {"ph": 7.0, "mv": None, "temp_c": None, "t": None}]}
+    assert approved.put(url, json=draft, auth=ADMIN).status_code == 200
+    saved = approved.get(url, auth=ADMIN).json()
+    assert saved["points"] == draft["points"] and saved["probe"] == "test probe"
+    assert approved.put(url, json={"points": [{"ph": 7, "t": "2026-10-28T09:00:00"}]},
+                        auth=ADMIN).status_code == 422  # capture time without zone
+    approved.post("/api/v1/boxes/box1/calibrations", auth=ADMIN, json={
+        "points": [[4.0, 2000.0, 25.0], [7.0, 1400.0, 25.0]]})
+    assert approved.get(url, auth=ADMIN).json() is None
+    box = approved.get("/api/v1/boxes/box1").json()
+    assert box["calibrated_at"] == box["calibrations"][-1]["t"]
+    assert box["calibrations"][-1]["points"] == [[4.0, 2000.0, 25.0], [7.0, 1400.0, 25.0]]
+
+
 def test_csv_export(approved):
     upload(approved, RECORDS)
     r = approved.get("/api/v1/boxes/box1/readings?format=csv&start=2026-10-28T09:00:05Z")
