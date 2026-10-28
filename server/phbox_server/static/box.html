@@ -58,9 +58,9 @@
   <script>
     initPage("overview");
     const id = new URLSearchParams(location.search).get("id") ?? "";
-    const RANGES = [[1, "1 h"], [6, "6 h"], [24, "24 h"], [168, t("days7")]];
-    let hours = Number(stored("range")) || 6;
-    if (!RANGES.some(([v]) => v === hours)) hours = 6;
+    const RANGES = [[1, "1 min"], [5, "5 min"], [30, "30 min"], [60, "1 h"], [360, "6 h"], [1440, "24 h"], [10080, t("days7")]];
+    let minutes = Number(stored("rangeMinutes")) || 360;
+    if (!RANGES.some(([v]) => v === minutes)) minutes = 360;
     let box = null, rows = [];
 
     const $ = (sel) => document.getElementById(sel);
@@ -94,8 +94,8 @@
     function renderRanges() {
       $("ranges").setAttribute("aria-label", t("range"));
       $("ranges").replaceChildren(...RANGES.map(([value, label]) => h("button", {
-        type: "button", "aria-pressed": String(value === hours),
-        onclick: () => { hours = value; store("range", value); renderRanges(); loadReadings(); },
+        type: "button", "aria-pressed": String(value === minutes),
+        onclick: () => { minutes = value; store("rangeMinutes", value); renderRanges(); loadReadings(); },
       }, label)));
     }
 
@@ -146,13 +146,14 @@
 
     function setWindow() {
       const now = Date.now();
-      group.setFull(now - hours * HOUR, now);
+      group.setFull(now - minutes * MINUTE, now);
     }
 
     async function loadReadings() {
       $("phChart").classList.add("loading");
       $("tempChart").classList.add("loading");
-      const start = new Date(Date.now() - hours * HOUR).toISOString().slice(0, 19) + "Z";
+      group.minSpan = Math.min(2 * MINUTE, minutes * MINUTE / 4); // short windows can still be zoomed
+      const start = new Date(Date.now() - minutes * MINUTE).toISOString().slice(0, 19) + "Z";
       const base = `/api/v1/boxes/${encodeURIComponent(id)}/readings?start=${start}`;
       rows = (await api(base)).map(withTime);
       $("csv").href = `${base}&format=csv`;
@@ -160,8 +161,8 @@
       phChart.setRows(rows);
       tempChart.setRows(rows);
       const now = Date.now();
-      group.full = [now - hours * HOUR, now];
-      group.view = [now - hours * HOUR, now];
+      group.full = [now - minutes * MINUTE, now];
+      group.view = [now - minutes * MINUTE, now];
       group.renderAll();
       group.onViewChange();
       $("phChart").classList.remove("loading");
@@ -197,7 +198,11 @@
         flash($("ph"));
       },
     }, () => box && loadReadings());
-    setInterval(() => { if (box) { renderHead(); setWindow(); } }, 10000);
+    // Short windows slide every second, long ones every ten seconds.
+    let ticks = 0;
+    setInterval(() => {
+      if (box && (minutes <= 60 || ++ticks % 10 === 0)) { renderHead(); setWindow(); }
+    }, 1000);
   </script>
 </body>
 </html>

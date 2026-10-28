@@ -368,7 +368,7 @@ button, select, input { font: inherit; color: inherit; }
 
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 26px 0 14px; }
 
-.segmented { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--rule); border-radius: 11px; }
+.segmented { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--rule); border-radius: 11px; }
 
 .segmented button {
   border: 0;
@@ -548,6 +548,8 @@ details.values .table-wrap { margin-top: 10px; max-height: 360px; overflow-y: au
   .topbar { gap: 12px; height: 60px; }
   .brand span:not(.brand-mark) { display: none; }
   .lede { font-size: 21px; }
+  .segmented { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .segmented button { padding: 5px 5px; white-space: nowrap; }
   .hero { grid-template-columns: 1fr; gap: 22px; }
   .hero .readout { font-size: 84px; }
   .detail-head h1 { font-size: 30px; }
