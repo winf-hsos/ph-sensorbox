@@ -1,48 +1,132 @@
 # Architecture
 
-Status: proposal, 2026-10-28. It follows the bench setup in `01-components.md` (Atlas Surveyor analog pH board on the Analog In Bricklet 3.0, Thermocouple Bricklet for temperature). In this setup the Brick reads two voltages and the software computes the pH, whereas an EZO-pH upgrade would move that computation into the EZO and add the RS232 Bricklet; the design has to be revisited if the front end changes.
+Status: the direction was agreed with Nicolas on 2026-10-28; the details below are proposals. Statements marked **(calculation)** or **(inference)** are ours and not taken from a source.
 
-## 1. What the ESP32 Brick can do
+## Requirements (Nicolas, 2026-10-28)
 
-According to the [ESP32 Brick page](https://www.tinkerforge.com/en/doc/Hardware/Bricks/ESP32_Brick.html), the Brick has six Bricklet ports, 16 MB of flash and Wi-Fi, and its standard firmware is a network gateway for the Bricklets with a web interface that manages only the network settings. The same page states that custom code can run directly on the Brick, alongside the standard firmware if desired. The standard firmware contains no data logging; it keeps its configuration in a small LittleFS partition of about 3.4 MiB (partition table in the [firmware repository](https://github.com/Tinkerforge/esp32-firmware)).
+- Many boxes run in parallel. Each box holds an ESP32 Brick, the Analog In Bricklet 3.0 with the Atlas analog pH board, the Thermocouple Bricklet 2.0 and an OLED 128x64 Bricklet as a display that only shows values.
+- The enclosure is 3D printed and fitted to these parts.
+- No cables except the pH probe and the thermocouple probe. The box has a single USB-C port for power, fed by a USB power supply or a power bank, and it has to run for several days in a row.
+- The boxes connect to an IoT Wi-Fi in the lab, which will be set up.
+- A central web dashboard in the cloud (for example on Uberspace) where the boxes register, with live monitoring and all data recorded and available for analysis.
 
-The firmware is open source under the LGPL 2.1 (`software/LICENSE` in that repository), built with PlatformIO and, for the web frontend, Node.js and `uv`. It can be extended with its own modules, as the [tutorial](https://www.tinkerforge.com/en/doc/Tutorials/Tutorial_ESP32_Firmware/Tutorial.html) shows with a polled Bricklet. For standalone code there are also the [microcontroller bindings](https://www.tinkerforge.com/en/doc/Software/API_Bindings_uC.html) for Arduino. The licence of those bindings and of the Brick hardware files was not found and has to be looked up before a licence is chosen for this project.
+## Overview
 
-## 2. Proposed approach in three phases
+```
+ Box (one of many)                         Server (Uberspace)                 Users
+ ┌───────────────────────────┐   HTTPS    ┌──────────────────────────┐      ┌───────────┐
+ │ ESP32 Brick, own firmware │  batches   │ ingest API               │      │ dashboard │
+ │  Analog In ← Atlas board  │ ─────────► │ registration + approval  │ ◄──► │ live view │
+ │  Thermocouple ← K probe   │  of raw    │ database (raw readings)  │      │ export    │
+ │  OLED 128x64 (display)    │  readings  │ calibration, pH compute  │      │ API       │
+ │  flash buffer when offline│ ◄───────── │ config for each box      │      └───────────┘
+ └───────────────────────────┘ calibration└──────────────────────────┘
+         ▲ USB-C power (supply or power bank)
+```
 
-**Phase 0, bench test without own firmware.** The bench host is a Master Brick on USB, which the Brick Daemon on the laptop serves on `localhost:4223`, so a Python script reads the Bricklets without any network setup. An ESP32 Brick with its standard firmware would serve the same bindings over Wi-Fi or Ethernet, but a first attempt on 2026-10-28 found no way to reach it over USB: `brickd` did not list it and its serial port was silent. The source code of the firmware opens TCP port 4223 for this (`proxy.cpp`), whereas no documentation page was found that confirms it, so this is the first thing to try. The phase answers the open hardware questions: how large the noise and drift of the analog pH voltage are, what the thermocouple delivers, whether the thermocouple disturbs the pH signal, and how well a two- or three-point calibration with buffers holds. The calibration and compensation code is first written in Python here and later ported to the firmware. The old prototype in `ph-sensor-dashboard` took the same route, but only read a voltage.
+The box is a measuring node and the server holds the data, the dashboard and the calibration. The box serves no monitoring web page of its own, because a central dashboard covers all boxes and a box that does not have to keep a web server ready can save power.
 
-**Phase 1, own module on the Brick.** The measurement runs on the Brick without a computer. A module in the Tinkerforge firmware reads the EZO and the thermocouple, sends the temperature to the EZO for compensation, stores the readings and serves them. The module route gives Wi-Fi setup, firmware update over the network and NTP time for free, at the price of the large build chain and the LGPL; the lighter alternative is an Arduino sketch, which would require writing the network setup, update and web server ourselves. We propose the module route and flag the licence consequence in the open questions.
+## 1. The box
 
-**Phase 2, open front end and polish.** Option B of the component proposal (own electrometer stage) as an alternative board, the enclosure design and documentation for rebuilders.
+### Hardware
 
-## 3. Software on the Brick (phase 1)
+| Part | Port | Note |
+|---|---|---|
+| ESP32 Brick | – | six Bricklet ports, three in use |
+| Analog In Bricklet 3.0 | 1 | reads the Atlas analog pH board |
+| Thermocouple Bricklet 2.0 | 1 | type K probe |
+| OLED 128x64 Bricklet | 1 | display only; Nicolas has several |
+| USB-C port in the enclosure wall | – | panel-mount extension to the Brick's own USB-C jack |
+
+According to the [ESP32 Brick page](https://www.tinkerforge.com/en/doc/Hardware/Bricks/ESP32_Brick.html) the Brick can be powered through its USB-C jack, so the box needs no power electronics of its own and no built-in battery; a power bank plays that role.
+
+### Power and runtime
+
+Sources: the ESP32 Brick draws 740 mW with Wi-Fi and 420 mW with Wi-Fi switched off ([Tinkerforge](https://www.tinkerforge.com/en/doc/Hardware/Bricks/ESP32_Brick.html), via a search summary, to be checked on the page); the Analog In Bricklet 3.0 draws about 70 mW; the Atlas board 3 mA, about 15 mW at 5 V. The draw of the Thermocouple and OLED Bricklets was not looked up yet.
+
+| Operating mode | Assumed total (calculation, Bricklets 0.15 to 0.25 W) | Runtime with a 20,000 mAh power bank (calculation, about 50 Wh usable at 5 V) |
+|---|---|---|
+| Wi-Fi always on | about 0.9 to 1.0 W | about 2 days |
+| Wi-Fi only for uploads, otherwise off | about 0.6 to 0.7 W | about 3 days |
+
+The usable energy of a power bank is lower than its printed capacity, because the capacity refers to the cell voltage of about 3.7 V and the conversion to 5 V costs further energy; the 50 Wh are an **assumption** for a typical 20,000 mAh bank. "Several days" is therefore reachable with a large power bank, but only with a firmware that keeps the radio off most of the time. Two practical risks follow **(inference)**: many power banks switch off when the current stays below a threshold, which the box must not undercut, and the real consumption has to be measured before the enclosure and the power bank are chosen.
+
+### Firmware
+
+A module in the Tinkerforge ESP32 firmware (LGPL 2.1), because Wi-Fi setup, network updates and NTP time already exist there and updates over the network matter for many boxes.
+
+| Task | Proposal |
+|---|---|
+| Sampling | read voltage and temperature every second (Analog In oversampling on), store one averaged record every 10 s; the interval is a setting from the server |
+| Display | pH, temperature, Wi-Fi state, upload backlog, box name; pH computed locally with the calibration copy received from the server |
+| Buffer | records go to a ring buffer in flash first and are deleted only after the server has confirmed them, so a Wi-Fi outage leaves no gap |
+| Upload | every 60 s a batch over HTTPS, radio off in between; the interval is a setting from the server |
+| Identity | the Brick's UID; after approval the server issues a token that the box sends with every upload |
+| Setup | Wi-Fi credentials and server address through the setup page that the firmware already has |
+
+How much the radio can really be switched off without breaking NTP, updates and the setup page is a question for the firmware work.
+
+## 2. Transport
+
+HTTPS with JSON batches from the box to the server. MQTT was considered, but on Uberspace only ports 80 and 443 are open from outside by default; direct TCP services need one of up to 20 ports in the range 40,000 to 61,000 ([Uberspace firewall ports](https://manual.uberspace.de/basics-ports/)). HTTPS through the web frontend needs no extra port and usually passes through restrictive networks.
+
+One requirement on the lab network follows from this: the IoT Wi-Fi must allow outbound HTTPS to the internet, which has to be confirmed with the IT department, because IoT networks are sometimes isolated.
+
+Sketch of one batch (proposal):
+
+```json
+{
+  "box": "227Z",
+  "firmware": "0.1.0",
+  "records": [
+    {"t": "2026-10-28T09:26:30Z", "mv": 1165.7, "temp_c": 22.19, "n": 10},
+    {"t": "2026-10-28T09:26:40Z", "mv": 1165.5, "temp_c": 22.20, "n": 10}
+  ]
+}
+```
+
+## 3. The server
+
+A web application that runs as a [web backend on Uberspace](https://manual.uberspace.de/web-backends): the application listens on a port, Uberspace terminates HTTPS and forwards the requests, and WebSockets are passed through; idle connections are closed after three minutes, so a live view needs keep-alive messages.
 
 | Part | Task |
 |---|---|
-| Sampling loop | Read the voltage of the pH board from the Analog In Bricklet and the temperature from the thermocouple once per second, average, and compute the pH. With an EZO upgrade, read the pH from the EZO instead and send it the temperature. |
-| Calibration | Two- or three-point calibration controlled from the web interface (a linear fit of voltage against pH, slope scaled with the absolute temperature), with each event written to the log. |
-| Log | Records of time (UTC from NTP), pH, temperature, plus metadata of the active probe and calibration. |
-| Web interface | Live value, short history, calibration, download. German and English. |
-| API | Read-only JSON endpoints for the current reading, a time range of the log (JSON or CSV) and the metadata; optional push to an MQTT broker or an HTTP address in the lab. |
+| Ingest API | accepts batches, checks the token, stores raw records, confirms them to the box |
+| Registration | an unknown box appears as "pending"; a person approves it and gives it a name and a location |
+| Calibration | records calibration events for each box and probe and computes pH from the raw values |
+| Dashboard | overview of all boxes with live values, history per box, state (last contact, backlog, power) |
+| Export and API | CSV and JSON for any time range, open read API |
 
-The endpoints are a proposal and do not exist yet. The MQTT modules in the Tinkerforge repository belong to the charger products, and whether they can be reused for the Brick was not checked.
+The same application should also run outside Uberspace (a lab PC or a Raspberry Pi), so that other labs can host it themselves; this fits the open-source goal. The language and the database are still open; Python fits the earlier prototype, and the database depends on what the host offers.
 
-### Storage
+## 4. Raw data are the truth
 
-The standard partition for files is about 3.4 MiB. With a compact record of 32 bytes this holds roughly 110,000 readings, which means about 31 hours at one reading per second or about 13 days at one reading per ten seconds (calculation, ignoring filesystem overhead and wear). Three ways to extend this are possible, none of them verified: a custom partition table that gives the file system more of the 16 MB flash, a SD card if the Brick can drive one, and a push of the data to a lab server. The design should therefore keep the box usable on its own for days and make the long-term archive a task of whatever receives the push.
+The box sends voltage and temperature, not pH. The server stores these raw values for good and computes pH with the calibration that was valid at the time. If a calibration later turns out to be wrong, a whole series can be recomputed. The box receives a copy of its current calibration only to show a pH value on its display.
 
-## 4. Data access
+Per calibration event: box, probe, time, buffer values, buffer temperatures, measured voltages, resulting slope and offset.
 
-The central promise of the project is open access, so the record format is part of the architecture. Proposed fields per reading: UTC time, pH, raw electrode-board voltage, temperature in °C, identifier of the active probe, identifier of the active calibration; and per calibration event: time, buffer values, buffer temperature, slope and offset. The same schema serves the CSV download and the JSON API, and the web interface only reads what the API serves. Authentication follows the firmware's own options (the proxy module accepts a secret); an unauthenticated port on a lab network is acceptable for tests only.
+## 5. Enclosure requirements
 
-## 5. Enclosure requirements (3D printed)
+- Room for the ESP32 Brick, three Bricklets, the Atlas board and short cables; dimensions from the Tinkerforge CAD data or measured.
+- A window for the OLED, a panel-mount USB-C socket, a feed-through for the pH probe (SMA or BNC, to be confirmed) and one for the thermocouple plug.
+- The pH input is very sensitive to moisture and dirt, so the enclosure should be closed and drip-protected **(inference)**.
+- Plastic around the Wi-Fi antenna, ventilation if the electronics warm up, and the Thermocouple Bricklet away from warm parts, because its cold-junction sensor sits on its own board.
+- No battery inside; the power bank stays outside or in a separate holder.
+- Parametric source files, printable without supports.
 
-- Space for the ESP32 Brick, the RS232 Bricklet, the Thermocouple Bricklet, the EZO with its carrier board and a short cable run; the dimensions still have to be taken from the data sheets or measured.
-- A BNC socket in the wall for the electrode, with the wire to the EZO as short as possible. The input is extremely sensitive to moisture and dirt, so the enclosure should be closed and drip-protected, and the electrode leakage paths should be kept clean **(inference)**.
-- A panel connector for the thermocouple probe, USB power inlet and a cut-out for status LEDs; plastic around the Wi-Fi antenna.
-- Printable without supports on a standard printer, with the source files in a parametric format.
+## 6. Phases
 
-## 6. Why not other designs
+| Phase | Content | State |
+|---|---|---|
+| 0 | Bench test with a Master Brick on USB and Python scripts: noise, calibration, temperature, interference | readout works (`05-bench-log.md`); calibration waits for buffers |
+| 1 | Server skeleton (ingest, registration, simple dashboard) and a box firmware that uploads raw readings | not started |
+| 2 | Power measurement, radio-off operation, display, enclosure | not started |
+| 3 | Calibration workflow in the dashboard, export, documentation for rebuilders | not started |
 
-A Raspberry Pi or server running the logger next to the Brick would be the quickest solution and is used in phase 0, but it contradicts the goal of a box that needs no computer. A pure ESP32 build without Tinkerforge parts (for example an ADS1115) was not examined; it would lose the tested Bricklets and drivers and is kept as a fallback.
+## 7. Open points
+
+- How the ESP32 Brick is reached over the network for the first firmware tests; over USB, `brickd` did not list it on 2026-10-28.
+- The real power consumption of the complete box, and whether common power banks keep it powered.
+- Whether the pH probe and the thermocouple disturb each other in the same vessel (see `01-components.md`, section 5).
+- Whether the IoT Wi-Fi allows outbound HTTPS.
+- Language, framework and database of the server; how the Uberspace account is provided.

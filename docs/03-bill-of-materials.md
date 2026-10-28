@@ -14,6 +14,15 @@ Status: proposal, 2026-10-28. The bench setup in use is an Atlas Surveyor analog
 | Atlas Scientific pH probe in its storage tube (photo of 2026-10-28; exact model and connector not identified) | 1 | the Atlas lab-grade probe was listed at 86.99 USD or 95.69 EUR | owned; model, membrane type and storage solution to confirm |
 | Buffer solutions pH 4.01, 7.00, 10.01 | 1 set | pH 10.01, 1 L: 41.19 EUR; the other two not priced | to buy or from stock |
 
+## Additionally for each finished box (requirements of 2026-10-28)
+
+| Item | Qty | Price | Status |
+|---|---|---|---|
+| Tinkerforge OLED 128x64 Bricklet 2.0 | 1 | not looked up | owned (several) |
+| USB-C panel-mount extension to the Brick's jack | 1 | not researched | to find |
+| Power bank, about 20,000 mAh, without auto-off at low current | 1 | not researched | to find and test |
+| 3D printed enclosure | 1 | material only | to design |
+
 ## Upgrade: EZO-pH route Prices are list prices of 2026-10-28 including 19 % VAT where the vendor shows it (Tinkerforge, RS, RobotShop EU) and are kept in the currency of the source. Nothing has been ordered. Shop pages carry no date of their own, so prices have to be re-checked at the time of ordering.
 
 ## Prototype
