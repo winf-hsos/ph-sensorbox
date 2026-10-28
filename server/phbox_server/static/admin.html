@@ -4,126 +4,151 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>pH-Sensorbox</title>
+  <script>try { const theme = localStorage.getItem("theme"); if (theme) document.documentElement.dataset.theme = theme; } catch {}</script>
+  <link rel="preload" href="/static/fonts/instrument-sans-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1 data-t="title">pH-Sensorbox</h1>
-    <nav><a href="/" data-t="overview">Übersicht</a><a href="/admin" class="active" data-t="admin">Verwaltung</a></nav>
-    <button id="lang">EN</button>
-  </header>
-  <main>
-    <section>
-      <h2 data-t="boxes">Boxen</h2>
-      <div class="card"><table id="boxes"></table></div>
+  <main class="wrap">
+    <p class="lede" id="title"></p>
+
+    <section class="block" id="pendingBlock" hidden>
+      <h2 id="pendingTitle"></h2>
+      <p class="muted" id="pendingHint"></p>
+      <div class="table-wrap"><table id="pending"></table></div>
     </section>
 
-    <section>
-      <h2 data-t="addCalibration">Kalibrierung eintragen</h2>
-      <div class="card">
-        <p class="muted" data-t="calHint"></p>
-        <div class="toolbar">
-          <span data-t="box">Box</span> <select id="calBox"></select>
-          <span data-t="probe">Sonde</span> <input id="calProbe" style="width:200px">
-        </div>
-        <table id="calPoints"></table>
-        <div class="toolbar" style="margin-top:10px">
-          <button class="primary" id="calSave" data-t="saveCalibration">Kalibrierung speichern</button>
-          <span id="msg" class="muted"></span>
-        </div>
-      </div>
+    <section class="block">
+      <h2 id="boxesTitle"></h2>
+      <div class="table-wrap"><table id="boxes"></table></div>
+    </section>
+
+    <section class="block">
+      <h2 id="calTitle"></h2>
+      <p class="muted" id="calHint"></p>
+      <div id="calForm"></div>
     </section>
   </main>
   <script src="/static/app.js"></script>
   <script>
+    initPage("admin");
+    document.title = `${t("admin")} – ${t("brand")}`;
+    const $ = (sel) => document.getElementById(sel);
+    $("title").textContent = t("admin");
+    $("pendingTitle").textContent = t("pendingTitle");
+    $("pendingHint").textContent = t("pendingHint");
+    $("boxesTitle").textContent = t("boxes");
+    $("calTitle").textContent = t("addCalibration");
+    $("calHint").textContent = t("calHint");
+
     let boxes = [];
     const BUFFERS = [4.01, 7.0, 10.01];
 
-    function renderBoxes() {
-      const el = document.getElementById("boxes");
-      el.innerHTML = `<tr><th></th><th>ID</th><th>${t("status")}</th><th>${t("name")}</th><th>${t("location")}</th>
-        <th>${t("intervals")}</th><th></th></tr>` + boxes.map((b) => `<tr data-id="${esc(b.id)}">
-        <td><span class="dot ${contactState(b)}"></span></td>
-        <td>${esc(b.id)}<br><span class="muted">${esc(b.firmware || "")}</span></td>
-        <td>${t(b.status)}<br><span class="muted">${fmt.ago(b.last_seen)}</span></td>
-        <td><input name="name" value="${esc(b.name || "")}"></td>
-        <td><input name="location" value="${esc(b.location || "")}"></td>
-        <td><input name="sample_interval_s" type="number" min="1" value="${b.sample_interval_s}" style="width:70px">
-            <input name="upload_interval_s" type="number" min="5" value="${b.upload_interval_s}" style="width:70px"></td>
-        <td><button data-act="save">${t("save")}</button>
-            ${b.status !== "approved" ? `<button class="primary" data-act="approved">${t("approve")}</button>` : ""}
-            ${b.status !== "blocked" ? `<button class="danger" data-act="blocked">${t("block")}</button>` : ""}</td>
-      </tr>`).join("");
+    async function patch(id, body) {
+      await api(`/api/v1/boxes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
+      await load();
     }
+
+    function renderPending() {
+      const pending = boxes.filter((b) => b.status === "pending");
+      $("pendingBlock").hidden = !pending.length;
+      $("pending").replaceChildren(
+        h("tr", {}, h("th", {}, "ID"), h("th", {}, "Firmware"), h("th", {}, t("lastReading")), h("th", {})),
+        ...pending.map((b) => h("tr", {},
+          h("td", {}, h("b", {}, b.id)), h("td", {}, b.firmware || "–"), h("td", {}, fmt.ago(b.last_seen)),
+          h("td", {}, h("div", { class: "row-actions" },
+            h("button", { class: "button primary", type: "button", onclick: () => patch(b.id, { status: "approved" }) }, t("approve")),
+            h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")))))));
+    }
+
+    function renderBoxes() {
+      const known = boxes.filter((b) => b.status !== "pending");
+      $("boxes").replaceChildren(
+        h("tr", {}, h("th", {}, "ID"), h("th", {}, t("status")), h("th", {}, t("name")), h("th", {}, t("location")),
+          h("th", {}, t("sampleInterval")), h("th", {}, t("uploadInterval")), h("th", {})),
+        ...known.map((b) => {
+          const fields = {
+            name: h("input", { class: "field", value: b.name ?? "", "aria-label": t("name") }),
+            location: h("input", { class: "field", value: b.location ?? "", "aria-label": t("location") }),
+            sample_interval_s: h("input", { class: "field num", type: "number", min: 1, value: b.sample_interval_s, "aria-label": t("sampleInterval") }),
+            upload_interval_s: h("input", { class: "field num", type: "number", min: 5, value: b.upload_interval_s, "aria-label": t("uploadInterval") }),
+          };
+          const save = () => patch(b.id, {
+            name: fields.name.value, location: fields.location.value,
+            sample_interval_s: Number(fields.sample_interval_s.value), upload_interval_s: Number(fields.upload_interval_s.value),
+          });
+          return h("tr", {},
+            h("td", {}, b.id, h("div", { class: "muted" }, b.firmware || "")),
+            h("td", {}, h("span", { class: "status", "data-state": b.status === "approved" ? contactState(b) : "none" }, t(b.status))),
+            h("td", {}, fields.name), h("td", {}, fields.location),
+            h("td", { style: "width:120px" }, fields.sample_interval_s), h("td", { style: "width:120px" }, fields.upload_interval_s),
+            h("td", {}, h("div", { class: "row-actions" },
+              h("button", { class: "button", type: "button", onclick: save }, t("save")),
+              b.status === "blocked"
+                ? h("button", { class: "button", type: "button", onclick: () => patch(b.id, { status: "approved" }) }, t("unblock"))
+                : h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")))));
+        }));
+    }
+
+    // Built once, so values typed into it survive live updates of the tables.
+    const cal = {
+      box: h("select", { class: "field", "aria-label": t("box") }),
+      probe: h("input", { class: "field", "aria-label": t("probe") }),
+      rows: BUFFERS.map((ph) => ({
+        ph: h("input", { class: "field num", type: "number", step: "0.01", value: ph, "aria-label": t("bufferPh") }),
+        mv: h("input", { class: "field num", type: "number", step: "0.1", "aria-label": t("voltage") }),
+        temp: h("input", { class: "field num", type: "number", step: "0.1", "aria-label": t("temperature") }),
+      })),
+      message: h("p", { class: "message", role: "status" }),
+    };
+
+    async function useCurrent(row) {
+      const fresh = (await api("/api/v1/admin/boxes")).find((b) => b.id === cal.box.value);
+      if (!fresh?.last) return;
+      row.mv.value = fresh.last.mv.toFixed(1);
+      row.temp.value = fresh.last.temp_c?.toFixed(2) ?? "";
+    }
+
+    async function saveCalibration() {
+      const points = cal.rows.map((r) => [r.ph.value, r.mv.value, r.temp.value])
+        .filter((p) => p.every((v) => v !== "")).map((p) => p.map(Number));
+      try {
+        const result = await api(`/api/v1/boxes/${encodeURIComponent(cal.box.value)}/calibrations`,
+          { method: "POST", body: JSON.stringify({ probe: cal.probe.value || null, points }) });
+        cal.message.textContent = t("calSaved", `${fmt.number(result.slope_mv_per_ph, 1)} mV/pH (${fmt.number(result.slope_percent, 1)} %)`, fmt.mv(result.offset_mv));
+      } catch (error) {
+        cal.message.textContent = error.message;
+      }
+    }
+
+    $("calForm").append(
+      h("div", { class: "controls" },
+        h("label", {}, t("box"), " ", cal.box),
+        h("label", { style: "flex:1; min-width:220px" }, t("probe"), " ", cal.probe)),
+      h("div", { class: "table-wrap" }, h("table", {},
+        h("tr", {}, h("th", {}, t("bufferPh")), h("th", {}, `${t("voltage")} (mV)`), h("th", {}, `${t("temperature")} (°C)`), h("th", {})),
+        ...cal.rows.map((r) => h("tr", {}, h("td", {}, r.ph), h("td", {}, r.mv), h("td", {}, r.temp),
+          h("td", {}, h("button", { class: "button", type: "button", onclick: () => useCurrent(r) }, t("useCurrent"))))))),
+      h("div", { class: "controls" },
+        h("button", { class: "button primary", type: "button", onclick: saveCalibration }, t("saveCalibration")), cal.message));
 
     function renderCalBoxes() {
-      const select = document.getElementById("calBox");
-      const current = select.value;
-      select.innerHTML = boxes.filter((b) => b.status === "approved")
-        .map((b) => `<option value="${esc(b.id)}">${esc(b.name || b.id)}</option>`).join("");
-      if (current) select.value = current;
-    }
-
-    // Rendered only at start and on a language change, so typed values survive live updates.
-    function renderCalPoints() {
-      document.getElementById("calPoints").innerHTML =
-        `<tr><th>${t("bufferPh")}</th><th>${t("voltage")} [mV]</th><th>${t("temperature")} [°C]</th><th></th></tr>` +
-        BUFFERS.map((ph, i) => `<tr data-i="${i}">
-          <td><input name="ph" type="number" step="0.01" value="${ph}"></td>
-          <td><input name="mv" type="number" step="0.1"></td>
-          <td><input name="temp" type="number" step="0.1"></td>
-          <td><button data-act="current">${t("useCurrent")}</button></td></tr>`).join("");
+      const current = cal.box.value;
+      const approved = boxes.filter((b) => b.status === "approved");
+      cal.box.replaceChildren(...approved.map((b) => h("option", { value: b.id }, b.name || b.id)));
+      if (approved.some((b) => b.id === current)) cal.box.value = current;
+      if (!approved.length) cal.message.textContent = t("noApproved");
     }
 
     async function load() {
       boxes = await api("/api/v1/admin/boxes");
+      renderPending();
       renderBoxes();
       renderCalBoxes();
     }
 
-    document.getElementById("boxes").addEventListener("click", async (e) => {
-      const act = e.target.dataset.act;
-      if (!act) return;
-      const tr = e.target.closest("tr");
-      const body = {};
-      tr.querySelectorAll("input").forEach((input) => {
-        body[input.name] = input.type === "number" ? +input.value : input.value;
-      });
-      if (act !== "save") body.status = act;
-      await api(`/api/v1/boxes/${encodeURIComponent(tr.dataset.id)}`, { method: "PATCH", body: JSON.stringify(body) });
-      await load();
-    });
-
-    document.getElementById("calPoints").addEventListener("click", async (e) => {
-      if (e.target.dataset.act !== "current") return;
-      const tr = e.target.closest("tr");
-      const box = boxes.find((b) => b.id === document.getElementById("calBox").value);
-      const fresh = (await api("/api/v1/admin/boxes")).find((b) => b.id === box?.id);
-      if (!fresh?.last) return;
-      tr.querySelector("[name=mv]").value = fresh.last.mv.toFixed(1);
-      tr.querySelector("[name=temp]").value = fresh.last.temp_c?.toFixed(2) ?? "";
-    });
-
-    document.getElementById("calSave").addEventListener("click", async () => {
-      const msg = document.getElementById("msg");
-      const points = [...document.querySelectorAll("#calPoints tr[data-i]")]
-        .map((tr) => ["ph", "mv", "temp"].map((n) => tr.querySelector(`[name=${n}]`).value))
-        .filter((p) => p.every((v) => v !== ""))
-        .map((p) => p.map(Number));
-      try {
-        const result = await api(`/api/v1/boxes/${encodeURIComponent(document.getElementById("calBox").value)}/calibrations`,
-          { method: "POST", body: JSON.stringify({ probe: document.getElementById("calProbe").value || null, points }) });
-        msg.textContent = `${t("saved")} ${t("slope")}: ${result.slope_mv_per_ph.toFixed(1)} mV/pH (${result.slope_percent} %), ` +
-          `${t("offset")}: ${result.offset_mv.toFixed(1)} mV`;
-      } catch (error) {
-        msg.textContent = error.message;
-      }
-    });
-
-    initPage(() => { renderBoxes(); renderCalPoints(); });
-    renderCalPoints();
     load();
-    live({ box: () => load() });
+    live({ box: () => load() }, load);
   </script>
 </body>
 </html>

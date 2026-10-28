@@ -1,6 +1,6 @@
 # Deployment on Uberspace 8
 
-Status: written on 2026-10-28 from the [Uberspace 8 manual](https://u8manual.uberspace.de/) (version 8.0.98 of 2026-10-05) and **not yet tested**, because access to the Asteroid has not been handed over. Steps marked **(check)** rely on a form of a command that the manual does not show exactly.
+Status: written on 2026-10-28 from the [Uberspace 8 manual](https://u8manual.uberspace.de/) (version 8.0.98 of 2026-10-05). On the same day the central assistant set the server up on `hsos` following steps 1 to 5 (code of commit `a64c934`, 15 tests passed on the server), and https://ph.hsos.uber.space/ answers. Steps still marked **(check)** have not been tried.
 
 ## Frame
 
@@ -10,7 +10,7 @@ The server runs on the Uberspace 8 Asteroid `hsos`, which is a shared workbench 
 - no assumption to be alone: all apps of the Asteroid share 1500 MiB of memory and 300 % CPU ([resources](https://u8manual.uberspace.de/basics_resources/)). A single uvicorn worker with SQLite is small; the memory it really uses should be checked after the start;
 - idle HTTP connections are closed after three minutes ([web backends](https://u8manual.uberspace.de/web_backends/)); the live view uses server-sent events with a keep-alive every 30 s.
 
-Chosen values (change them if they collide with another app on the Asteroid, see `uberspace web backend list`):
+Chosen values (change them if they collide with another app on the Asteroid, see `uberspace web backend list`). On 2026-10-28 the Asteroid also served `lifi.hsos.uber.space` (port 8000, service `lifi-server`) and `live.hsos.uber.space` (port 8001, service `classroom-live`).
 
 | Item | Value |
 |---|---|
@@ -75,18 +75,18 @@ The manual gives no example for automatic restarts after a crash. If the service
 
 ```bash
 uberspace web domain add ph.hsos.uber.space
-uberspace web backend add ph.hsos.uber.space/ port 8710      # (check)
+uberspace web backend add ph.hsos.uber.space/ port 8710 --force
 uberspace web backend list
 ```
 
-The manual documents subdomains of `<user>.uber.space` and backends in the form `domain/path`, but shows no example for the root path of a subdomain; `uberspace web backend list` shows whether the route took effect. HTTPS comes from Let's Encrypt through the Caddy front end ([HTTP stack](https://u8manual.uberspace.de/background_http/)).
+The manual shows no example for the root path of a subdomain, but this form worked on 2026-10-28. `--force` was added because the Asteroid has a default backend `* /` pointing to Apache; whether it is strictly needed is not known. HTTPS comes from Let's Encrypt through the Caddy front end ([HTTP stack](https://u8manual.uberspace.de/background_http/)).
 
 ## 6. Check
 
 1. `https://ph.hsos.uber.space/` shows the overview, `https://ph.hsos.uber.space/docs` the API.
 2. `https://ph.hsos.uber.space/admin` asks for the user `admin` and the password from step 3.
 3. On the bench: `python tools/bench_box.py --server https://ph.hsos.uber.space --box bench`, then approve the box under `/admin`.
-4. The overview updates live within a minute and keeps updating for more than three minutes, which shows that the keep-alive gets through the front end (not covered by the manual) **(check)**.
+4. The overview updates live within a minute. A test on 2026-10-28 from the university network showed that the event stream is cut after exactly 60 seconds, although the keep-alive at 30 seconds arrived; the same test against the local server stayed open, so the cut happens on the way through Uberspace's front end or the university network (not yet clear which). The dashboard copes with it: the browser reconnects after five seconds and the page then fetches the readings it may have missed.
 5. Memory use: `systemctl --user status ph-sensorbox` shows it.
 
 ## 7. Updates
@@ -105,7 +105,7 @@ Uberspace keeps daily and weekly snapshots of the home directory under `/backup`
 ## Removal
 
 ```bash
-uberspace web backend del ph.hsos.uber.space/      # (check)
+uberspace web backend del ph.hsos.uber.space/
 uberspace web domain del ph.hsos.uber.space
 uberspace service del ph-sensorbox
 ```

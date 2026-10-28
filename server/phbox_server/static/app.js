@@ -1,209 +1,305 @@
-// Shared helpers for the dashboard pages: translations, formatting, API, live stream, chart.
+// Shared helpers for the dashboard pages: texts, number formats, theme, pH scale, API, live stream.
 
 const TEXT = {
   de: {
-    title: "pH-Sensorbox",
+    brand: "pH-Sensorbox",
     overview: "Übersicht",
     admin: "Verwaltung",
-    noBoxes: "Noch keine freigegebenen Boxen.",
-    lastContact: "letzter Kontakt",
-    never: "nie",
-    ago: "vor",
-    uncalibrated: "unkalibriert",
+    theme: "Hell oder dunkel",
+    langSwitch: "Switch to English",
+    backToOverview: "Übersicht",
+    ledeNone: "Noch keine Box ist freigegeben.",
+    ledeAll: (n) => (n === 1 ? "Eine Box, sie liefert gerade Werte." : `${n} Boxen, alle liefern gerade Werte.`),
+    ledeSome: (n, live) => `${n} Boxen, ${live === 0 ? "keine" : live} davon ${live === 1 ? "liefert" : "liefern"} gerade Werte.`,
+    emptyTitle: "Hier erscheinen die Messboxen, sobald sie freigegeben sind.",
+    emptyBody: "Eine neue Box meldet sich von selbst und wartet in der Verwaltung auf die Freigabe.",
+    emptyLink: "Zur Verwaltung",
+    live: "misst",
+    late: "verzögert",
+    none: "keine Daten",
+    lastReading: "letzte Messung",
+    never: "noch keine",
+    ago: (s) => `vor ${s}`,
     calibrated: "kalibriert",
+    uncalibrated: "unkalibriert",
     temperature: "Temperatur",
     voltage: "Spannung",
+    calibration: "Kalibrierung",
+    calibratedOn: (d) => `seit ${d}`,
+    phScale: (v) => `pH ${v} auf der Skala von 0 bis 14`,
     range: "Zeitraum",
-    export: "Export",
-    calibrations: "Kalibrierungen",
-    noCalibrations: "Keine Kalibrierung, der pH-Wert folgt der Nennkennlinie der Atlas-Platine.",
+    resetZoom: "Ausschnitt zurücksetzen",
+    zoomHint: "Ziehen vergrößert einen Ausschnitt, Doppelklick zeigt wieder alles.",
+    days7: "7 Tage",
+    phChart: "pH-Wert",
+    tempChart: "Temperatur in °C",
+    noData: "In diesem Zeitraum gibt es keine Messwerte.",
+    valuesTable: "Messwerte als Tabelle",
     time: "Zeit",
+    samples: "Proben",
+    calibrations: "Kalibrierungen",
+    noCalibrations: "Noch keine Kalibrierung. Der pH-Wert folgt der Nennkennlinie der Atlas-Platine und ist deshalb nur ein Richtwert.",
     probe: "Sonde",
+    points: "Pufferpunkte",
     slope: "Steilheit",
-    offset: "Offset bei pH 7",
-    points: "Punkte",
-    noData: "Keine Messwerte in diesem Zeitraum.",
-    boxes: "Boxen",
+    offset: "Spannung bei pH 7",
+    notFound: "Diese Box gibt es nicht oder sie ist noch nicht freigegeben.",
+    pendingTitle: "Neue Boxen",
+    pendingHint: "Vergleiche die Kennung mit der Anzeige an der Box, bevor du sie freigibst.",
+    boxes: "Alle Boxen",
     status: "Status",
     name: "Name",
     location: "Ort",
-    intervals: "Intervalle (s)",
+    sampleInterval: "Messintervall (s)",
+    uploadInterval: "Sendeintervall (s)",
     approve: "Freigeben",
     block: "Sperren",
+    unblock: "Entsperren",
     save: "Speichern",
-    pending: "wartet",
+    saved: "Gespeichert.",
+    pending: "wartet auf Freigabe",
     approved: "freigegeben",
     blocked: "gesperrt",
     addCalibration: "Kalibrierung eintragen",
+    calHint: "Zwei oder drei Puffer. Übernimm den Wert erst, wenn er sich kaum noch ändert, also weniger als 1 mV pro Minute.",
     box: "Box",
     bufferPh: "Puffer-pH",
-    useCurrent: "aktuellen Wert übernehmen",
+    useCurrent: "Aktuellen Wert übernehmen",
     saveCalibration: "Kalibrierung speichern",
-    saved: "Gespeichert.",
-    calHint: "Zwei oder drei Puffer; den Wert erst übernehmen, wenn er sich nicht mehr ändert (unter 1 mV pro Minute).",
+    calSaved: (s, o) => `Kalibrierung gespeichert: Steilheit ${s}, Spannung bei pH 7 ${o}.`,
+    noApproved: "Es gibt noch keine freigegebene Box.",
   },
   en: {
-    title: "pH Sensor Box",
+    brand: "pH Sensor Box",
     overview: "Overview",
     admin: "Administration",
-    noBoxes: "No approved boxes yet.",
-    lastContact: "last contact",
-    never: "never",
-    ago: "",
-    uncalibrated: "uncalibrated",
+    theme: "Light or dark",
+    langSwitch: "Auf Deutsch umschalten",
+    backToOverview: "Overview",
+    ledeNone: "No box has been approved yet.",
+    ledeAll: (n) => (n === 1 ? "One box, currently delivering readings." : `${n} boxes, all currently delivering readings.`),
+    ledeSome: (n, live) => `${n} boxes, ${live === 0 ? "none" : live} of them currently delivering readings.`,
+    emptyTitle: "Measuring boxes appear here once they are approved.",
+    emptyBody: "A new box registers by itself and waits for approval in the administration.",
+    emptyLink: "Go to administration",
+    live: "measuring",
+    late: "delayed",
+    none: "no data",
+    lastReading: "last reading",
+    never: "none yet",
+    ago: (s) => `${s} ago`,
     calibrated: "calibrated",
+    uncalibrated: "uncalibrated",
     temperature: "Temperature",
     voltage: "Voltage",
+    calibration: "Calibration",
+    calibratedOn: (d) => `since ${d}`,
+    phScale: (v) => `pH ${v} on the scale from 0 to 14`,
     range: "Range",
-    export: "Export",
-    calibrations: "Calibrations",
-    noCalibrations: "No calibration; the pH follows the nominal curve of the Atlas board.",
+    resetZoom: "Reset zoom",
+    zoomHint: "Drag to zoom into a section, double-click to see everything again.",
+    days7: "7 days",
+    phChart: "pH value",
+    tempChart: "Temperature in °C",
+    noData: "There are no readings in this range.",
+    valuesTable: "Readings as a table",
     time: "Time",
+    samples: "Samples",
+    calibrations: "Calibrations",
+    noCalibrations: "No calibration yet. The pH follows the nominal curve of the Atlas board and is only a rough value.",
     probe: "Probe",
+    points: "Buffer points",
     slope: "Slope",
-    offset: "Offset at pH 7",
-    points: "Points",
-    noData: "No readings in this range.",
-    boxes: "Boxes",
+    offset: "Voltage at pH 7",
+    notFound: "This box does not exist or has not been approved yet.",
+    pendingTitle: "New boxes",
+    pendingHint: "Compare the id with the one shown on the box before you approve it.",
+    boxes: "All boxes",
     status: "Status",
     name: "Name",
     location: "Location",
-    intervals: "Intervals (s)",
+    sampleInterval: "Sample interval (s)",
+    uploadInterval: "Upload interval (s)",
     approve: "Approve",
     block: "Block",
+    unblock: "Unblock",
     save: "Save",
-    pending: "pending",
+    saved: "Saved.",
+    pending: "waiting for approval",
     approved: "approved",
     blocked: "blocked",
-    addCalibration: "Add calibration",
+    addCalibration: "Add a calibration",
+    calHint: "Two or three buffers. Take a value only once it has settled, at less than 1 mV per minute.",
     box: "Box",
     bufferPh: "Buffer pH",
-    useCurrent: "use current value",
+    useCurrent: "Use current value",
     saveCalibration: "Save calibration",
-    saved: "Saved.",
-    calHint: "Two or three buffers; take the value only once it has settled (below 1 mV per minute).",
+    calSaved: (s, o) => `Calibration saved: slope ${s}, voltage at pH 7 ${o}.`,
+    noApproved: "No box has been approved yet.",
   },
 };
 
-function storedLang() {
-  try { return localStorage.getItem("lang"); } catch { return null; }
+function stored(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
 }
 
-let lang = storedLang() || (navigator.language.startsWith("de") ? "de" : "en");
-const t = (key) => TEXT[lang][key] ?? key;
-
-function applyText() {
-  document.documentElement.lang = lang;
-  document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = t(el.dataset.t); });
-  const toggle = document.getElementById("lang");
-  if (toggle) toggle.textContent = lang === "de" ? "EN" : "DE";
+function store(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* private mode: keep the default */ }
 }
 
-function initPage(onLangChange) {
-  applyText();
-  document.getElementById("lang").addEventListener("click", () => {
-    lang = lang === "de" ? "en" : "de";
-    try { localStorage.setItem("lang", lang); } catch { /* private mode */ }
-    applyText();
-    onLangChange?.();
-  });
-}
+let lang = stored("lang") || (navigator.language.startsWith("de") ? "de" : "en");
+const t = (key, ...args) => {
+  const value = TEXT[lang][key] ?? key;
+  return typeof value === "function" ? value(...args) : value;
+};
+const locale = () => (lang === "de" ? "de-DE" : "en-GB");
+
+// ---------- numbers and times ----------
 
 const fmt = {
-  ph: (v) => (v == null ? "–" : v.toFixed(2)),
-  temp: (v) => (v == null ? "–" : `${v.toFixed(1)} °C`),
-  mv: (v) => (v == null ? "–" : `${v.toFixed(1)} mV`),
-  time: (iso) => new Date(iso).toLocaleString(lang === "de" ? "de-DE" : "en-GB"),
+  number: (v, digits) => (v == null ? "–" : new Intl.NumberFormat(locale(), {
+    minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v)),
+  ph: (v) => fmt.number(v, 2),
+  temp: (v) => (v == null ? "–" : `${fmt.number(v, 1)} °C`),
+  mv: (v) => (v == null ? "–" : `${fmt.number(v, 1)} mV`),
+  dateTime: (iso) => new Date(iso).toLocaleString(locale(), {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+  date: (iso) => new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" }),
   ago(iso) {
     if (!iso) return t("never");
     const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
-    const span = s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
-    return lang === "de" ? `${t("ago")} ${span}` : `${span} ago`;
+    const span = s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`;
+    return t("ago", span);
   },
 };
 
-// Green while uploads arrive on time, yellow when overdue, grey when never seen.
+// live: uploads arrive on time; late: overdue; none: never seen
 function contactState(box) {
-  if (!box.last_seen) return "";
+  if (!box.last_seen) return "none";
   const age = (Date.now() - new Date(box.last_seen)) / 1000;
-  return age < 3 * box.upload_interval_s ? "ok" : "warn";
+  return age < 3 * box.upload_interval_s ? "live" : "late";
 }
 
-async function api(path, options = {}) {
-  const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
+// ---------- DOM ----------
+
+function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const child of children.flat()) {
+    if (child == null || child === false) continue;
+    el.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return el;
+}
+
+// view-transition-name must be an identifier; box ids are [A-Za-z0-9_-]
+const vtName = (part, id) => `${part}-b${id}`;
+
+function scale(ph, { ticks = [0, 7, 14] } = {}) {
+  const el = h("div", { class: "scale", role: "img" },
+    h("div", { class: "scale-bar" }),
+    h("div", { class: "scale-needle" }),
+    h("div", { class: "scale-ticks" }, ticks.map((v) => h("span", {}, v))));
+  setScale(el, ph);
+  return el;
+}
+
+function setScale(el, ph) {
+  if (ph == null || Number.isNaN(ph)) {
+    el.setAttribute("data-empty", "");
+    el.setAttribute("aria-label", "pH –");
+    return;
+  }
+  el.removeAttribute("data-empty");
+  const pos = Math.min(14, Math.max(0, ph)) / 14 * 100;
+  el.style.setProperty("--pos", `${pos}%`);
+  el.setAttribute("aria-label", t("phScale", fmt.ph(ph)));
+}
+
+function readout(el, ph) {
+  el.replaceChildren(fmt.ph(ph), h("small", {}, "pH"));
+}
+
+function flash(el) {
+  el.classList.add("fresh");
+  setTimeout(() => el.classList.remove("fresh"), 700);
+}
+
+// ---------- page frame ----------
+
+const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>';
+const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>';
+
+function currentTheme() {
+  const set = document.documentElement.dataset.theme;
+  if (set) return set;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme() {
+  const saved = stored("theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+}
+
+function header(active) {
+  const themeButton = h("button", { class: "icon-button", type: "button", "aria-label": t("theme"), title: t("theme") });
+  themeButton.innerHTML = currentTheme() === "dark" ? ICON_SUN : ICON_MOON;
+  themeButton.addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    store("theme", next);
+    themeButton.innerHTML = next === "dark" ? ICON_SUN : ICON_MOON;
+    window.dispatchEvent(new Event("themechange"));
   });
-  if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
+  const langButton = h("button", { class: "icon-button", type: "button", "aria-label": t("langSwitch"), title: t("langSwitch") },
+    lang === "de" ? "EN" : "DE");
+  langButton.addEventListener("click", () => {
+    store("lang", lang === "de" ? "en" : "de");
+    location.reload();
+  });
+  return h("header", { class: "wrap topbar" },
+    h("a", { class: "brand", href: "/" }, h("span", { class: "brand-mark", "aria-hidden": "true" }), h("span", {}, t("brand"))),
+    h("nav", { class: "nav" },
+      h("a", { href: "/", "aria-current": active === "overview" ? "page" : null }, t("overview")),
+      h("a", { href: "/admin", "aria-current": active === "admin" ? "page" : null }, t("admin"))),
+    h("div", { class: "tools" }, langButton, themeButton));
+}
+
+function initPage(active) {
+  applyTheme();
+  document.documentElement.lang = lang;
+  document.body.prepend(header(active));
+}
+
+// ---------- API and live stream ----------
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+  if (!response.ok) {
+    const error = new Error(`${response.status} ${await response.text()}`);
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 
-function live(handlers) {
+// EventSource reconnects by itself; onResync runs after every reconnect so that
+// readings sent while the connection was down are fetched again.
+function live(handlers, onResync) {
   const source = new EventSource("/api/v1/stream");
+  let opened = false;
+  source.addEventListener("open", () => {
+    if (opened) onResync?.();
+    opened = true;
+  });
   for (const [event, handler] of Object.entries(handlers)) {
     source.addEventListener(event, (e) => handler(JSON.parse(e.data)));
   }
   return source;
-}
-
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-// A small line chart on a canvas: points are [Date, value]; gaps longer than maxGap ms break the line.
-// minSpan keeps sensor noise from filling the whole height when the values barely change.
-function drawChart(canvas, points, { label = "", digits = 2, maxGap = Infinity, minSpan = 0 } = {}) {
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, w, h);
-  const css = getComputedStyle(document.documentElement);
-  const muted = css.getPropertyValue("--muted"), line = css.getPropertyValue("--line");
-  ctx.font = "12px system-ui, sans-serif";
-  ctx.fillStyle = muted;
-  if (points.length < 2) {
-    ctx.fillText(t("noData"), 10, 20);
-    return;
-  }
-  const pad = { l: 52, r: 12, t: 18, b: 24 };
-  const xs = points.map((p) => +p[0]), ys = points.map((p) => p[1]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  let y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const span = Math.max(minSpan, 1e-6);
-  if (y1 - y0 < span) {
-    const mid = (y0 + y1) / 2;
-    y0 = mid - span / 2;
-    y1 = mid + span / 2;
-  }
-  const margin = (y1 - y0) * 0.08;
-  y0 -= margin; y1 += margin;
-  const X = (x) => pad.l + ((x - x0) / (x1 - x0 || 1)) * (w - pad.l - pad.r);
-  const Y = (y) => h - pad.b - ((y - y0) / (y1 - y0)) * (h - pad.t - pad.b);
-
-  ctx.strokeStyle = line;
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const v = y0 + ((y1 - y0) * i) / 4, y = Y(v);
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
-    ctx.fillText(v.toFixed(digits), 4, y + 4);
-  }
-  const locale = lang === "de" ? "de-DE" : "en-GB";
-  const long = x1 - x0 > 36 * 3600e3, short = x1 - x0 < 15 * 60e3;
-  for (let i = 0; i <= 4; i++) {
-    const x = x0 + ((x1 - x0) * i) / 4, d = new Date(x);
-    const text = long ? d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit" })
-      : d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", ...(short && { second: "2-digit" }) });
-    ctx.fillText(text, Math.min(X(x) - 14, w - pad.r - 34), h - 6);
-  }
-  ctx.fillText(label, pad.l, 12);
-
-  ctx.strokeStyle = css.getPropertyValue("--accent");
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  points.forEach(([d, v], i) => {
-    const gap = i > 0 && +d - +points[i - 1][0] > maxGap;
-    if (i === 0 || gap) ctx.moveTo(X(+d), Y(v)); else ctx.lineTo(X(+d), Y(v));
-  });
-  ctx.stroke();
 }

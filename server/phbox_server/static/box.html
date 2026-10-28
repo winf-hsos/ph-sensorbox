@@ -4,116 +4,200 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>pH-Sensorbox</title>
+  <script>try { const theme = localStorage.getItem("theme"); if (theme) document.documentElement.dataset.theme = theme; } catch {}</script>
+  <link rel="preload" href="/static/fonts/instrument-sans-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1 data-t="title">pH-Sensorbox</h1>
-    <nav><a href="/" data-t="overview">Übersicht</a><a href="/admin" data-t="admin">Verwaltung</a></nav>
-    <button id="lang">EN</button>
-  </header>
-  <main>
-    <section class="card">
-      <h2 id="name"><span class="dot"></span></h2>
-      <div class="muted" id="where"></div>
-      <div class="ph" id="ph">– <small>pH</small></div>
-      <div class="row" id="values"></div>
-    </section>
-
-    <section>
-      <div class="toolbar">
-        <span data-t="range">Zeitraum</span>
-        <select id="range">
-          <option value="1">1 h</option>
-          <option value="6" selected>6 h</option>
-          <option value="24">24 h</option>
-          <option value="168">7 d</option>
-        </select>
-        <span style="flex:1"></span>
-        <span data-t="export">Export</span>
-        <a id="csv" href="#">CSV</a>
-        <a id="json" href="#">JSON</a>
+  <main class="wrap" id="main">
+    <a class="back" href="/"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg><span id="backText"></span></a>
+    <div class="detail-head">
+      <div>
+        <h1 id="name">&nbsp;</h1>
+        <p class="detail-sub" id="sub">&nbsp;</p>
       </div>
-      <div class="card"><canvas id="phChart"></canvas></div>
-      <div class="card" style="margin-top:12px"><canvas id="tempChart"></canvas></div>
-    </section>
+      <span class="status" id="status"></span>
+    </div>
 
-    <section>
-      <h2 data-t="calibrations">Kalibrierungen</h2>
-      <div id="cals" class="card"></div>
+    <div class="hero">
+      <div>
+        <div class="readout" id="ph"></div>
+        <div id="scaleSlot"></div>
+      </div>
+      <dl id="facts"></dl>
+    </div>
+
+    <div class="controls">
+      <div class="segmented" id="ranges" role="group"></div>
+      <button class="text-button" id="reset" type="button" hidden></button>
+      <span class="spacer"></span>
+      <div class="export"><a id="csv" href="#" download>CSV</a><a id="json" href="#">JSON</a></div>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-title"><h2 id="phTitle"></h2><span class="hint" id="hint"></span></div>
+      <div id="phChart"></div>
+    </div>
+    <div class="chart-block">
+      <div class="chart-title"><h2 id="tempTitle"></h2></div>
+      <div id="tempChart" class="small"></div>
+    </div>
+
+    <details class="values" id="values">
+      <summary id="valuesTitle"></summary>
+      <div class="table-wrap"><table id="valuesTable"></table></div>
+    </details>
+
+    <section class="block">
+      <h2 id="calTitle"></h2>
+      <div id="cals"></div>
     </section>
   </main>
   <script src="/static/app.js"></script>
+  <script src="/static/plot.js"></script>
   <script>
-    const id = new URLSearchParams(location.search).get("id");
+    initPage("overview");
+    const id = new URLSearchParams(location.search).get("id") ?? "";
+    const RANGES = [[1, "1 h"], [6, "6 h"], [24, "24 h"], [168, t("days7")]];
+    let hours = Number(stored("range")) || 6;
+    if (!RANGES.some(([v]) => v === hours)) hours = 6;
     let box = null, rows = [];
 
-    function since() {
-      const hours = +document.getElementById("range").value;
-      return new Date(Date.now() - hours * 3600e3).toISOString().slice(0, 19) + "Z";
+    const $ = (sel) => document.getElementById(sel);
+    $("backText").textContent = t("backToOverview");
+    $("phTitle").textContent = t("phChart");
+    $("tempTitle").textContent = t("tempChart");
+    $("hint").textContent = t("zoomHint");
+    $("reset").textContent = t("resetZoom");
+    $("valuesTitle").textContent = t("valuesTable");
+    $("calTitle").textContent = t("calibrations");
+
+    // the elements that glide over from the overview tile
+    $("name").style.viewTransitionName = vtName("name", id);
+    $("ph").style.viewTransitionName = vtName("ph", id);
+    const bigScale = scale(null, { ticks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] });
+    bigScale.style.viewTransitionName = vtName("scale", id);
+    $("scaleSlot").append(bigScale);
+
+    const group = new ChartGroup();
+    const phChart = group.add(new TimeChart($("phChart"), {
+      label: t("phChart"), value: (r) => r.ph, digits: 2, minSpan: 0.2,
+      tooltip: (r) => [[fmt.ph(r.ph), "pH"], [fmt.temp(r.temp_c), t("temperature")], [fmt.mv(r.mv), t("voltage")]],
+    }));
+    const tempChart = group.add(new TimeChart($("tempChart"), {
+      label: t("tempChart"), value: (r) => r.temp_c, digits: 1, minSpan: 1,
+      tooltip: (r) => [[fmt.temp(r.temp_c), t("temperature")], [fmt.ph(r.ph), "pH"]],
+    }));
+    group.onViewChange = () => { $("reset").hidden = !group.zoomed(); renderTable(); };
+    $("reset").addEventListener("click", () => group.reset());
+
+    function renderRanges() {
+      $("ranges").setAttribute("aria-label", t("range"));
+      $("ranges").replaceChildren(...RANGES.map(([value, label]) => h("button", {
+        type: "button", "aria-pressed": String(value === hours),
+        onclick: () => { hours = value; store("range", value); renderRanges(); loadReadings(); },
+      }, label)));
     }
 
     function renderHead() {
       if (!box) return;
-      const last = rows.at(-1) || box.last;
-      document.title = `${box.name || box.id} – ${t("title")}`;
-      document.getElementById("name").innerHTML =
-        `<span class="dot ${contactState(box)}"></span>${esc(box.name || box.id)} <span class="muted">${esc(box.id)}</span>`;
-      document.getElementById("where").textContent = box.location || "";
-      document.getElementById("ph").innerHTML = `${fmt.ph(last?.ph)} <small>pH</small>`;
-      const cal = last && last.calibration_id != null;
-      document.getElementById("values").innerHTML = `
-        <span>${t("temperature")}: ${fmt.temp(last?.temp_c)}</span>
-        <span>${t("voltage")}: ${fmt.mv(last?.mv)}</span>
-        <span class="tag ${cal ? "" : "uncal"}">${t(cal ? "calibrated" : "uncalibrated")}</span>
-        <span class="muted">${t("lastContact")}: ${fmt.ago(box.last_seen)}</span>`;
+      const last = rows.at(-1) ?? box.last;
+      document.title = `${box.name || box.id} – ${t("brand")}`;
+      $("name").textContent = box.name || box.id;
+      $("sub").textContent = [box.location, box.id !== box.name ? box.id : null].filter(Boolean).join(", ");
+      const state = contactState(box);
+      $("status").dataset.state = state;
+      $("status").textContent = t(state);
+      readout($("ph"), last?.ph);
+      setScale(bigScale, last?.ph);
+      const cal = box.calibrations.at(-1);
+      const calibrated = last && last.calibration_id != null;
+      $("facts").replaceChildren(
+        h("dt", {}, t("temperature")), h("dd", { class: "num" }, fmt.temp(last?.temp_c)),
+        h("dt", {}, t("voltage")), h("dd", { class: "num" }, fmt.mv(last?.mv)),
+        h("dt", {}, t("calibration")), h("dd", {}, h("span", { class: "tag", "data-kind": calibrated ? "cal" : "uncal" },
+          calibrated && cal ? `${t("calibrated")} ${t("calibratedOn", fmt.date(cal.t))}` : t("uncalibrated"))),
+        h("dt", {}, t("lastReading")), h("dd", {}, fmt.ago(last?.t)));
     }
 
-    function renderCharts() {
-      const gap = 3 * box.sample_interval_s * 1000;
-      drawChart(document.getElementById("phChart"),
-        rows.map((r) => [new Date(r.t), r.ph]), { label: "pH", digits: 2, maxGap: gap, minSpan: 0.2 });
-      drawChart(document.getElementById("tempChart"),
-        rows.filter((r) => r.temp_c != null).map((r) => [new Date(r.t), r.temp_c]),
-        { label: `${t("temperature")} [°C]`, digits: 1, maxGap: gap, minSpan: 1 });
+    function renderTable() {
+      const [x0, x1] = group.view;
+      const visible = rows.filter((r) => r._t >= x0 && r._t <= x1).slice(-500).reverse();
+      $("valuesTable").replaceChildren(
+        h("tr", {}, h("th", {}, t("time")), h("th", { class: "num" }, "pH"), h("th", { class: "num" }, t("temperature")),
+          h("th", { class: "num" }, t("voltage")), h("th", { class: "num" }, t("samples"))),
+        ...visible.map((r) => h("tr", {}, h("td", {}, fmt.dateTime(r.t)), h("td", { class: "num" }, fmt.ph(r.ph)),
+          h("td", { class: "num" }, fmt.temp(r.temp_c)), h("td", { class: "num" }, fmt.mv(r.mv)), h("td", { class: "num" }, r.n ?? "–"))));
     }
 
-    function renderCals() {
-      const el = document.getElementById("cals");
-      if (!box.calibrations.length) { el.innerHTML = `<span class="muted">${t("noCalibrations")}</span>`; return; }
-      el.innerHTML = `<table><tr><th>${t("time")}</th><th>${t("probe")}</th><th>${t("points")}</th>
-        <th>${t("slope")}</th><th>${t("offset")}</th></tr>` +
-        box.calibrations.slice().reverse().map((c) => `<tr><td>${fmt.time(c.t)}</td><td>${esc(c.probe || "–")}</td>
-          <td>${c.points.map((p) => `pH ${p[0]}: ${p[1].toFixed(1)} mV, ${p[2].toFixed(1)} °C`).join("<br>")}</td>
-          <td>${c.slope_mv_per_ph.toFixed(1)} mV/pH (${c.slope_percent} %)</td>
-          <td>${c.offset_mv.toFixed(1)} mV</td></tr>`).join("") + "</table>";
+    function renderCalibrations() {
+      if (!box.calibrations.length) { $("cals").replaceChildren(h("p", { class: "muted" }, t("noCalibrations"))); return; }
+      $("cals").replaceChildren(h("div", { class: "table-wrap" }, h("table", {},
+        h("tr", {}, h("th", {}, t("time")), h("th", {}, t("probe")), h("th", {}, t("points")),
+          h("th", { class: "num" }, t("slope")), h("th", { class: "num" }, t("offset"))),
+        ...box.calibrations.slice().reverse().map((c) => h("tr", {},
+          h("td", {}, fmt.dateTime(c.t)), h("td", {}, c.probe || "–"),
+          h("td", {}, c.points.map((p, k) => [k ? h("br") : null, `pH ${fmt.number(p[0], 2)}: ${fmt.mv(p[1])}, ${fmt.temp(p[2])}`])),
+          h("td", { class: "num" }, `${fmt.number(c.slope_mv_per_ph, 1)} mV/pH (${fmt.number(c.slope_percent, 1)} %)`),
+          h("td", { class: "num" }, fmt.mv(c.offset_mv)))))));
     }
 
-    function renderAll() { renderHead(); renderCharts(); renderCals(); }
+    const withTime = (r) => ({ ...r, _t: Date.parse(r.t) });
+
+    function setWindow() {
+      const now = Date.now();
+      group.setFull(now - hours * HOUR, now);
+    }
+
+    async function loadReadings() {
+      $("phChart").classList.add("loading");
+      $("tempChart").classList.add("loading");
+      const start = new Date(Date.now() - hours * HOUR).toISOString().slice(0, 19) + "Z";
+      const base = `/api/v1/boxes/${encodeURIComponent(id)}/readings?start=${start}`;
+      rows = (await api(base)).map(withTime);
+      $("csv").href = `${base}&format=csv`;
+      $("json").href = base;
+      phChart.setRows(rows);
+      tempChart.setRows(rows);
+      const now = Date.now();
+      group.full = [now - hours * HOUR, now];
+      group.view = [now - hours * HOUR, now];
+      group.renderAll();
+      group.onViewChange();
+      $("phChart").classList.remove("loading");
+      $("tempChart").classList.remove("loading");
+      renderHead();
+    }
 
     async function load() {
-      box = await api(`/api/v1/boxes/${encodeURIComponent(id)}`);
-      const query = `start=${since()}`;
-      rows = await api(`/api/v1/boxes/${encodeURIComponent(id)}/readings?${query}`);
-      document.getElementById("csv").href = `/api/v1/boxes/${encodeURIComponent(id)}/readings?${query}&format=csv`;
-      document.getElementById("json").href = `/api/v1/boxes/${encodeURIComponent(id)}/readings?${query}`;
-      renderAll();
+      try {
+        box = await api(`/api/v1/boxes/${encodeURIComponent(id)}`);
+      } catch (error) {
+        $("main").replaceChildren(h("div", { class: "empty" }, h("p", {}, t("notFound")), h("a", { href: "/" }, t("backToOverview"))));
+        return;
+      }
+      group.maxGap = 3 * box.sample_interval_s * SECOND;
+      renderHead();
+      renderCalibrations();
+      await loadReadings();
     }
 
-    initPage(() => box && renderAll());
-    document.getElementById("range").addEventListener("change", load);
-    window.addEventListener("resize", () => box && renderCharts());
-    load().catch((e) => { document.querySelector("main").innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+    renderRanges();
+    document.fonts.ready.then(load);
+    window.addEventListener("themechange", () => group.renderAll());
     live({
       reading(r) {
         if (r.box !== id || !box) return;
-        rows.push(r);
+        rows.push(withTime(r));
+        phChart.setRows(rows);
+        tempChart.setRows(rows);
         box.last_seen = new Date().toISOString();
+        setWindow();
         renderHead();
-        renderCharts();
+        flash($("ph"));
       },
-    });
-    setInterval(() => box && renderHead(), 10000);
+    }, () => box && loadReadings());
+    setInterval(() => { if (box) { renderHead(); setWindow(); } }, 10000);
   </script>
 </body>
 </html>

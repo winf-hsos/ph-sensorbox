@@ -2,7 +2,7 @@
 
 The central server of the pH Sensor Box: boxes register here and upload their raw readings, an administrator approves them and enters calibrations, and everyone with access sees a live dashboard and can export the data. The design is described in `../docs/02-architecture.md`, the box protocol in `../docs/06-box-protocol.md`.
 
-Python, FastAPI and SQLite; the dashboard is plain HTML and JavaScript without a build step, in German and English.
+Python, FastAPI and SQLite; the dashboard is plain HTML, CSS and JavaScript without a build step or external requests, in German and English, with light and dark themes. The charts (`static/plot.js`) are drawn on canvas without a chart library: crosshair with tooltip, drag to zoom, double-click to reset, arrow keys to step. The typeface Instrument Sans is served from `static/fonts/` under the SIL Open Font License (`OFL-instrument-sans.txt`), so no font service is contacted.
 
 ## Run locally
 
