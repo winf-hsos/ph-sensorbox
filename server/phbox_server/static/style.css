@@ -222,6 +222,7 @@ button, select, input { font: inherit; color: inherit; }
 
 .status[data-state="live"]::before { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
 .status[data-state="late"]::before { background: var(--warn); }
+.status[data-state="inactive"]::before { background: var(--danger); }
 
 .tag {
   display: inline-flex;

@@ -16,6 +16,7 @@ const TEXT = {
     emptyLink: "Zur Verwaltung",
     live: "misst",
     late: "verzögert",
+    inactive: "inaktiv",
     none: "keine Daten",
     lastReading: "letzte Messung",
     never: "noch keine",
@@ -99,6 +100,7 @@ const TEXT = {
     emptyLink: "Go to administration",
     live: "measuring",
     late: "delayed",
+    inactive: "inactive",
     none: "no data",
     lastReading: "last reading",
     never: "none yet",
@@ -206,11 +208,13 @@ const fmt = {
   },
 };
 
-// live: uploads arrive on time; late: overdue; none: never seen
+// live: uploads arrive on time; late: two uploads missed; inactive: silent for ten upload
+// intervals, but at least five minutes, so a short network hiccup stays "late"; none: never seen
 function contactState(box) {
   if (!box.last_seen) return "none";
   const age = (Date.now() - new Date(box.last_seen)) / 1000;
-  return age < 3 * box.upload_interval_s ? "live" : "late";
+  if (age < 3 * box.upload_interval_s) return "live";
+  return age < Math.max(10 * box.upload_interval_s, 300) ? "late" : "inactive";
 }
 
 // ---------- DOM ----------
