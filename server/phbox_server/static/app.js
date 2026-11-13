@@ -56,6 +56,10 @@ const TEXT = {
     approve: "Freigeben",
     block: "Sperren",
     unblock: "Entsperren",
+    remove: "Löschen",
+    removePrompt: (id) => `Die Box „${id}“ wird mit allen Messungen und Kalibrierungen endgültig gelöscht. Läuft sie noch, meldet sie sich danach neu an und wartet auf Freigabe.
+
+Zum Bestätigen die ID eintippen:`,
     save: "Speichern",
     saved: "Gespeichert.",
     pending: "wartet auf Freigabe",
@@ -140,6 +144,10 @@ const TEXT = {
     approve: "Approve",
     block: "Block",
     unblock: "Unblock",
+    remove: "Delete",
+    removePrompt: (id) => `The box “${id}” will be deleted for good, with all its readings and calibrations. If it is still running, it registers again and waits for approval.
+
+Type the ID to confirm:`,
     save: "Save",
     saved: "Saved.",
     pending: "waiting for approval",

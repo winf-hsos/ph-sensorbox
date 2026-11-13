@@ -334,6 +334,15 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
         hub.publish("box", box_out(box, with_last=False))
         return box_out(box)
 
+    # Deleting is final: readings, calibrations and the draft go with the box. A box
+    # that is still running registers again on its next upload and waits for approval.
+    @app.delete("/api/v1/boxes/{box_id}", dependencies=[Depends(require_admin)])
+    async def delete_box(box_id: str):
+        box_or_404(box_id)
+        counts = db.delete_box(con, box_id)
+        hub.publish("box", {"id": box_id, "status": "deleted"})
+        return {"id": box_id, "deleted": counts}
+
     @app.post("/api/v1/boxes/{box_id}/calibrations", dependencies=[Depends(require_admin)])
     async def add_calibration(box_id: str, body: CalibrationIn):
         box_or_404(box_id)

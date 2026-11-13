@@ -92,6 +92,24 @@ def test_calibration_draft_survives_until_the_calibration_is_saved(approved):
     assert box["calibrations"][-1]["points"] == [[4.0, 2000.0, 25.0], [7.0, 1400.0, 25.0]]
 
 
+def test_deleting_a_box_removes_everything_stored_for_it(approved):
+    assert upload(approved, RECORDS).status_code == 200
+    approved.post("/api/v1/boxes/box1/calibrations", auth=ADMIN,
+                  json={"points": [[4.0, 1376, 21.7], [7.0, 1169, 21.7]]})
+    approved.put("/api/v1/boxes/box1/calibration-draft", auth=ADMIN, json={"points": []})
+    assert approved.delete("/api/v1/boxes/box1").status_code == 401
+    r = approved.delete("/api/v1/boxes/box1", auth=ADMIN)
+    assert r.status_code == 200
+    assert r.json()["deleted"] == {"readings": 2, "calibrations": 1, "calibration_drafts": 1, "boxes": 1}
+    assert approved.get("/api/v1/boxes/box1").status_code == 404
+    assert approved.get("/api/v1/admin/boxes", auth=ADMIN).json() == []
+    assert approved.delete("/api/v1/boxes/box1", auth=ADMIN).status_code == 404
+    # a box that keeps running comes back as a new, pending box
+    assert upload(approved, RECORDS).status_code == 401
+    r = approved.post("/api/v1/register", json={"box": "box1", "secret": SECRET})
+    assert r.json()["status"] == "pending"
+
+
 def test_csv_export(approved):
     upload(approved, RECORDS)
     r = approved.get("/api/v1/boxes/box1/readings?format=csv&start=2026-10-28T09:00:05Z")

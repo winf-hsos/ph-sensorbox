@@ -52,6 +52,13 @@
       await load();
     }
 
+    async function remove(id) {
+      const typed = prompt(t("removePrompt", id));
+      if (typed === null || typed.trim() !== id) return;
+      await api(`/api/v1/boxes/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await load();
+    }
+
     function renderPending() {
       const pending = boxes.filter((b) => b.status === "pending");
       $("pendingBlock").hidden = !pending.length;
@@ -62,7 +69,8 @@
           h("td", { "data-label": t("lastReading") }, fmt.ago(b.last_seen)),
           h("td", { class: "wide" }, h("div", { class: "row-actions" },
             h("button", { class: "button primary", type: "button", onclick: () => patch(b.id, { status: "approved" }) }, t("approve")),
-            h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")))))));
+            h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")),
+            h("button", { class: "button danger", type: "button", onclick: () => remove(b.id) }, t("remove")))))));
     }
 
     function renderBoxes() {
@@ -93,7 +101,8 @@
               h("button", { class: "button", type: "button", onclick: save }, t("save")),
               b.status === "blocked"
                 ? h("button", { class: "button", type: "button", onclick: () => patch(b.id, { status: "approved" }) }, t("unblock"))
-                : h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")))));
+                : h("button", { class: "button danger", type: "button", onclick: () => patch(b.id, { status: "blocked" }) }, t("block")),
+              h("button", { class: "button danger", type: "button", onclick: () => remove(b.id) }, t("remove")))));
         }));
     }
 

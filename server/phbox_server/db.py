@@ -171,3 +171,13 @@ def set_draft(con, box_id, draft) -> str:
 def delete_draft(con, box_id):
     con.execute("DELETE FROM calibration_drafts WHERE box_id = ?", (box_id,))
     con.commit()
+
+
+def delete_box(con, box_id) -> dict:
+    """Remove a box with everything stored for it; return how many rows went per table."""
+    counts = {}
+    with con:  # one transaction: all or nothing
+        for table in ("readings", "calibrations", "calibration_drafts"):
+            counts[table] = con.execute(f"DELETE FROM {table} WHERE box_id = ?", (box_id,)).rowcount
+        counts["boxes"] = con.execute("DELETE FROM boxes WHERE id = ?", (box_id,)).rowcount
+    return counts

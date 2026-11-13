@@ -1,0 +1,28 @@
+{
+ "box": "bench",
+ "exported": "2026-11-13",
+ "source": "https://ph.hsos.uber.space",
+ "calibrations": [
+  {
+   "id": 1,
+   "t": "2026-10-28T13:28:46Z",
+   "probe": null,
+   "points": [
+    [
+     4.0,
+     1376.0,
+     21.74
+    ],
+    [
+     7.0,
+     1169.0,
+     21.74
+    ]
+   ],
+   "offset_mv": 1169.0,
+   "slope_mv_per_ph": -69.0,
+   "temp_c": 21.74,
+   "slope_percent": 35.7
+  }
+ ]
+}
