@@ -1,0 +1,67 @@
+#!/bin/bash
+# Everyday commands for the pH Sensor Box on a Raspberry Pi.
+# The output is German because it is read by the people who run the box.
+set -u
+
+SERVICE=ph-box.service
+RUNSTATE=/run/ph-box/state.json
+
+usage() {
+    cat <<'EOF'
+ph-box status     Version, Dienst, Verbindung, letzte Messung
+ph-box update     neueste Version von GitHub holen und einspielen
+ph-box log        die letzten Meldungen (log -f: laufend mitlesen)
+ph-box restart    Dienst neu starten
+EOF
+}
+
+case "${1:-status}" in
+status)
+    echo "Dienst:          $(systemctl is-active $SERVICE)"
+    echo "Uhrzeit:         $(date '+%Y-%m-%d %H:%M:%S %Z'), synchronisiert: $(timedatectl show -p NTPSynchronized --value)"
+    echo "Nächstes Update: $(systemctl show -p NextElapseUSecRealtime --value ph-box-update.timer 2>/dev/null || echo unbekannt)"
+    if [ -r "$RUNSTATE" ]; then
+        python3 - "$RUNSTATE" <<'EOF'
+import json, sys
+s = json.load(open(sys.argv[1]))
+last = s.get("last_record") or {}
+rows = [
+    ("Version", s.get("version")),
+    ("Box", f"{s.get('box')} an {s.get('server')}"),
+    ("Freigabe", {"approved": "freigegeben", "pending": "wartet auf Freigabe in der Verwaltung",
+                  "blocked": "gesperrt"}.get(s.get("status"), s.get("status"))),
+    ("Phase", s.get("phase")),
+    ("Brick", {"ok": "verbunden", "lost": "nicht erreichbar", "not found": "kein Analog In gefunden",
+               "no brickd": "brickd läuft nicht"}.get(s.get("brick"), s.get("brick"))),
+    ("Letzte Messung", f"{last.get('t')}: {last.get('mv')} mV, {last.get('temp_c')} °C" if last else "noch keine"),
+    ("Letzter Upload", s.get("last_upload") or "noch keiner"),
+    ("Nicht gesendet", f"{s.get('backlog')} Messungen"),
+    ("Letzter Fehler", s.get("last_error") or "keiner"),
+]
+for label, value in rows:
+    print(f"{label + ':':<17}{value}")
+EOF
+    else
+        echo "Noch kein Zustand: der Dienst ist seit dem Start nicht bis zur Messung gekommen."
+    fi
+    ;;
+update)
+    exec sudo /usr/local/sbin/ph-box-update
+    ;;
+log)
+    if [ "${2:-}" = "-f" ]; then
+        exec journalctl -u $SERVICE -u ph-box-update.service -f
+    fi
+    exec journalctl -u $SERVICE -u ph-box-update.service -n 40 --no-pager
+    ;;
+restart)
+    exec sudo systemctl restart $SERVICE
+    ;;
+-h|--help|help)
+    usage
+    ;;
+*)
+    usage
+    exit 1
+    ;;
+esac

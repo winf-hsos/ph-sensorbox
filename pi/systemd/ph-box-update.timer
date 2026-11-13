@@ -1,0 +1,11 @@
+[Unit]
+Description=pH Sensor Box: look for a new release once a day
+
+[Timer]
+OnBootSec=15min
+OnCalendar=*-*-* 03:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

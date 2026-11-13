@@ -1,0 +1,13 @@
+# Settings of the pH Sensor Box service, installed as /etc/ph-box/config.toml.
+# After a change: sudo systemctl restart ph-box
+
+# Server that receives the readings.
+server = "https://ph.hsos.uber.space"
+
+# Name under which the box registers. It must be unique on the server
+# (letters, digits, - and _, at most 32 characters). The installer sets the hostname.
+box = "ph-box-1"
+
+# UIDs of the Bricklets. Leave them empty to find them by enumeration.
+analog_uid = ""
+tc_uid = ""

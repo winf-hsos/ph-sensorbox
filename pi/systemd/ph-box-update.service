@@ -1,0 +1,8 @@
+[Unit]
+Description=pH Sensor Box: install the newest release tag from GitHub
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ph-box-update

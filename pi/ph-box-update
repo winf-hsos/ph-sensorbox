@@ -1,0 +1,66 @@
+#!/bin/bash
+# Update the pH Sensor Box service to the newest release tag (box-v*) on GitHub.
+#
+# Runs as root, from the daily timer ph-box-update.timer or by hand (`ph-box update`).
+# Only tags count, not every commit on main: a release is made by pushing a tag such
+# as box-v1.1.0. After switching, the service must run for 60 s without a restart and
+# report the new version; otherwise the previous version comes back and the failed tag
+# is skipped from then on.
+set -u
+
+REPO=/opt/ph-sensorbox
+STATE=/var/lib/ph-box
+RUNSTATE=/run/ph-box/state.json
+SERVICE=ph-box.service
+SETTLE=60
+
+cd "$REPO" || { echo "no checkout in $REPO"; exit 1; }
+
+if ! git fetch --quiet --tags --force --prune --prune-tags origin; then
+    echo "fetch from $(git remote get-url origin) failed, staying on the installed version"
+    exit 1
+fi
+
+latest=$(git tag --list 'box-v*' --sort=-version:refname | head -n 1)
+current=$(cat "$STATE/version" 2>/dev/null || echo "")
+
+if [ -z "$latest" ]; then
+    echo "no release tag (box-v*) yet, staying on ${current:-the installed version}"
+    exit 0
+fi
+if [ "$latest" = "$current" ]; then
+    echo "up to date: $current"
+    exit 0
+fi
+if grep -qxF "$latest" "$STATE/failed-versions" 2>/dev/null; then
+    echo "$latest failed before, staying on $current (remove it from $STATE/failed-versions to retry)"
+    exit 0
+fi
+
+previous_commit=$(git rev-parse HEAD)
+
+switch_to() {  # $1 = commit or tag, $2 = version name
+    git -c advice.detachedHead=false checkout --quiet --force "$1" || return 1
+    echo "$2" > "$STATE/version"
+    systemctl restart "$SERVICE"
+}
+
+healthy() {  # $1 = expected version
+    local restarts_before restarts_after reported
+    restarts_before=$(systemctl show -p NRestarts --value "$SERVICE")
+    sleep "$SETTLE"
+    restarts_after=$(systemctl show -p NRestarts --value "$SERVICE")
+    reported=$(python3 -c "import json; print(json.load(open('$RUNSTATE'))['version'])" 2>/dev/null)
+    systemctl is-active --quiet "$SERVICE" && [ "$restarts_before" = "$restarts_after" ] && [ "$reported" = "$1" ]
+}
+
+echo "updating from ${current:-unknown} to $latest"
+if switch_to "$latest" "$latest" && healthy "$latest"; then
+    echo "now running $latest"
+    exit 0
+fi
+
+echo "$latest did not start cleanly, going back to ${current:-$previous_commit}"
+echo "$latest" >> "$STATE/failed-versions"
+switch_to "$previous_commit" "${current:-$previous_commit}"
+exit 1

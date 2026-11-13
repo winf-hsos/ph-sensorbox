@@ -1,0 +1,19 @@
+[Unit]
+Description=pH Sensor Box: measure and upload to the server
+Wants=network-online.target brickd.service
+After=network-online.target time-sync.target brickd.service
+
+[Service]
+User=phbox
+ExecStart=/usr/bin/python3 /opt/ph-sensorbox/pi/ph_box.py --config /etc/ph-box/config.toml
+Restart=always
+RestartSec=10
+StateDirectory=ph-box
+StateDirectoryMode=0755
+RuntimeDirectory=ph-box
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
