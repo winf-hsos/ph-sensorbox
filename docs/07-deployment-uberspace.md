@@ -97,7 +97,16 @@ Updates are copied by hand from a clean checkout of `main` (https://github.com/w
 git archive --format=tar HEAD:server | ssh hsos@<host>.uberspace.de 'tar -x -C ~/ph-sensorbox/server && cd ~/ph-sensorbox/server && .venv/bin/python -m pip install -q -r requirements.txt && .venv/bin/python -m pytest -q && systemctl --user restart ph-sensorbox'
 ```
 
-The archive overwrites changed files and adds new ones but does not delete files that were removed from the repository; those have to be removed by hand. The first update this way went from `a64c934` to `b3127cb` on 2026-10-28, after checking that the files on the server still matched `a64c934`.
+The archive overwrites changed files and adds new ones but does not delete files that were removed from the repository; those have to be removed by hand. The first update this way went from `a64c934` to `b3127cb` on 2026-10-28, after checking that the files on the server still matched `a64c934`. Since 2026-11-13 the server runs `9de2e68`.
+
+Before a change that deletes data, make a consistent copy of the database first; `.backup` is safe while the service is running:
+
+```
+cd ~/ph-sensorbox/data && mkdir -p backup && chmod 700 backup
+sqlite3 phbox.sqlite3 ".backup backup/2026-11-13-before-deleting-bench.sqlite3"
+```
+
+That copy was made on 2026-11-13 before the bench box was deleted with the new delete button. A daily backup is not set up yet.
 
 Boxes keep their readings while the server restarts and upload them afterwards (see `06-box-protocol.md`).
 
