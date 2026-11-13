@@ -229,7 +229,7 @@ next_search = time.monotonic()
 voltages, temperatures = [], []
 record_due = upload_due = time.monotonic()
 brick_lost = False
-save_state(phase="running", backlog=len(backlog))
+save_state(phase="running", backlog=len(backlog), last_record=backlog[-1] if backlog else None)
 
 try:
     while True:

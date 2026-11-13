@@ -1,6 +1,6 @@
 # Box protocol
 
-Status: version 1, implemented by the server in `server/` and by the bench box `tools/bench_box.py`, which serves as the reference for the ESP32 firmware. All bodies are JSON, all times UTC in ISO 8601 with `Z`.
+Status: version 1, implemented by the server in `server/`, by the bench box `tools/bench_box.py`, which serves as the reference for the ESP32 firmware, and by the Raspberry Pi service `pi/ph_box.py` (see `08-raspberry-pi.md`). All bodies are JSON, all times UTC in ISO 8601 with `Z`.
 
 ## 1. Registration
 

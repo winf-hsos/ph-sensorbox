@@ -14,6 +14,7 @@ Early development. The bench setup (Atlas analog pH board and thermocouple on Ti
 |---|---|
 | `docs/` | Concept, component choices, architecture, box protocol, bench log |
 | `server/` | Central server: API, dashboard, calibration (Python, FastAPI, SQLite) |
+| `pi/` | Service for a Raspberry Pi as box computer, with self-updates from release tags |
 | `tools/` | Bench scripts: list devices, read sensors, act as a box, analyse steps |
 | `data/` | Raw data of bench tests |
 
