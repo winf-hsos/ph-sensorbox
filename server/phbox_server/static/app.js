@@ -334,17 +334,38 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-// EventSource reconnects by itself; onResync runs after every reconnect so that
-// readings sent while the connection was down are fetched again.
+// EventSource reconnects by itself when the server closes the stream, but not when
+// the connection dies silently, as after a laptop sleeps or changes networks: then it
+// waits forever. The server sends a ping every 30 s, so a stream that stays silent
+// for 75 s is replaced. onResync runs after every reconnect and when the page becomes
+// visible again, so readings sent in the meantime are fetched.
 function live(handlers, onResync) {
-  const source = new EventSource("/api/v1/stream");
-  let opened = false;
-  source.addEventListener("open", () => {
-    if (opened) onResync?.();
-    opened = true;
-  });
-  for (const [event, handler] of Object.entries(handlers)) {
-    source.addEventListener(event, (e) => handler(JSON.parse(e.data)));
+  const STALE_MS = 75000;
+  let source = null, heard = Date.now(), first = true;
+
+  function connect() {
+    source?.close();
+    source = new EventSource("/api/v1/stream");
+    heard = Date.now();
+    source.addEventListener("open", () => {
+      heard = Date.now();
+      if (!first) onResync?.();
+      first = false;
+    });
+    source.addEventListener("ping", () => { heard = Date.now(); });
+    for (const [event, handler] of Object.entries(handlers)) {
+      source.addEventListener(event, (e) => { heard = Date.now(); handler(JSON.parse(e.data)); });
+    }
   }
-  return source;
+
+  connect();
+  setInterval(() => { if (Date.now() - heard > STALE_MS) connect(); }, 10000);
+  let hiddenAt = null;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") { hiddenAt = Date.now(); return; }
+    if (Date.now() - heard > STALE_MS) connect(); // resyncs once it is open
+    else if (hiddenAt && Date.now() - hiddenAt > 60000) onResync?.(); // a throttled tab may have missed events
+    hiddenAt = null;
+  });
+  window.addEventListener("online", connect);
 }

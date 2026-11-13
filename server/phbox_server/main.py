@@ -294,7 +294,9 @@ def create_app(db_path: str | None = None, admin_password: str | None = None) ->
                         # Uberspace closes idle connections after three minutes
                         yield await asyncio.wait_for(queue.get(), timeout=30)
                     except asyncio.TimeoutError:
-                        yield ": keep-alive\n\n"
+                        # a real event, not a comment, so that the page can tell a
+                        # quiet stream from a dead one
+                        yield "event: ping\ndata: {}\n\n"
             finally:
                 hub.queues.discard(queue)
 
